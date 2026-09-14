@@ -1,0 +1,283 @@
+  error: subprocess-exited-with-error
+  
+  × Building wheel for asyncpg (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [267 lines of output]
+      C:\Users\ASUS\AppData\Local\Temp\pip-build-env-23lgek5o\overlay\Lib\site-packages\setuptools\config\_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+      !!
+      
+              ********************************************************************************
+              Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+      
+              By 2027-Feb-18, you need to update your project and remove deprecated calls
+              or your builds will no longer be supported.
+      
+              See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+              ********************************************************************************
+      
+      !!
+        corresp(dist, value, root_dir)
+      C:\Users\ASUS\AppData\Local\Temp\pip-build-env-23lgek5o\overlay\Lib\site-packages\setuptools\config\_apply_pyprojecttoml.py:61: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+      !!
+      
+              ********************************************************************************
+              Please consider removing the following classifiers in favor of a SPDX license expression:
+      
+              License :: OSI Approved :: Apache Software License
+      
+              See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+              ********************************************************************************
+      
+      !!
+        dist._finalize_license_expression()
+      C:\Users\ASUS\AppData\Local\Temp\pip-build-env-23lgek5o\overlay\Lib\site-packages\setuptools\dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+      !!
+      
+              ********************************************************************************
+              Please consider removing the following classifiers in favor of a SPDX license expression:
+      
+              License :: OSI Approved :: Apache Software License
+      
+              See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+              ********************************************************************************
+      
+      !!
+        self._finalize_license_expression()
+      running bdist_wheel
+      running build
+      running build_py
+      creating build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\cluster.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\compat.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\connection.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\connect_utils.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\connresource.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\cursor.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\introspection.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\pool.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\prepared_stmt.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\serverversion.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\transaction.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\types.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\utils.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\_asyncio_compat.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\_version.py -> build\lib.win-amd64-cpython-314\asyncpg
+      copying asyncpg\__init__.py -> build\lib.win-amd64-cpython-314\asyncpg
+      creating build\lib.win-amd64-cpython-314\asyncpg\exceptions
+      copying asyncpg\exceptions\_base.py -> build\lib.win-amd64-cpython-314\asyncpg\exceptions
+      copying asyncpg\exceptions\__init__.py -> build\lib.win-amd64-cpython-314\asyncpg\exceptions
+      creating build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\types.py -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\__init__.py -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      creating build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\__init__.py -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      creating build\lib.win-amd64-cpython-314\asyncpg\_testbase
+      copying asyncpg\_testbase\fuzzer.py -> build\lib.win-amd64-cpython-314\asyncpg\_testbase
+      copying asyncpg\_testbase\__init__.py -> build\lib.win-amd64-cpython-314\asyncpg\_testbase
+      creating build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\__init__.py -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      running egg_info
+      writing asyncpg.egg-info\PKG-INFO
+      writing dependency_links to asyncpg.egg-info\dependency_links.txt
+      writing requirements to asyncpg.egg-info\requires.txt
+      writing top-level names to asyncpg.egg-info\top_level.txt
+      reading manifest file 'asyncpg.egg-info\SOURCES.txt'
+      reading manifest template 'MANIFEST.in'
+      warning: no files found matching '*.py' under directory 'examples'
+      adding license file 'LICENSE'
+      adding license file 'AUTHORS'
+      writing manifest file 'asyncpg.egg-info\SOURCES.txt'
+      C:\Users\ASUS\AppData\Local\Temp\pip-build-env-23lgek5o\overlay\Lib\site-packages\setuptools\command\build_py.py:215: _Warning: Package 'asyncpg.pgproto' is absent from the `packages` configuration.
+      !!
+      
+              ********************************************************************************
+              ############################
+              # Package would be ignored #
+              ############################
+              Python recognizes 'asyncpg.pgproto' as an importable package[^1],
+              but it is absent from setuptools' `packages` configuration.
+      
+              This leads to an ambiguous overall configuration. If you want to distribute this
+              package, please make sure that 'asyncpg.pgproto' is explicitly added
+              to the `packages` configuration field.
+      
+              Alternatively, you can also rely on setuptools' discovery methods
+              (for example by using `find_namespace_packages(...)`/`find_namespace:`
+              instead of `find_packages(...)`/`find:`).
+      
+              You can read more about "package discovery" on setuptools documentation page:
+      
+              - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+      
+              If you don't want 'asyncpg.pgproto' to be distributed and are
+              already explicitly excluding 'asyncpg.pgproto' via
+              `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+              you can try to use `exclude_package_data`, or `include-package-data=False` in
+              combination with a more fine grained `package-data` configuration.
+      
+              You can read more about "package data files" on setuptools documentation page:
+      
+              - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+      
+      
+              [^1]: For Python, any directory (with suitable naming) can be imported,
+                    even if it does not contain any `.py` files.
+                    On the other hand, currently there is no concept of package data
+                    directory, all directories are treated like packages.
+              ********************************************************************************
+      
+      !!
+        check.warn(importable)
+      C:\Users\ASUS\AppData\Local\Temp\pip-build-env-23lgek5o\overlay\Lib\site-packages\setuptools\command\build_py.py:215: _Warning: Package 'asyncpg.protocol' is absent from the `packages` configuration.
+      !!
+      
+              ********************************************************************************
+              ############################
+              # Package would be ignored #
+              ############################
+              Python recognizes 'asyncpg.protocol' as an importable package[^1],
+              but it is absent from setuptools' `packages` configuration.
+      
+              This leads to an ambiguous overall configuration. If you want to distribute this
+              package, please make sure that 'asyncpg.protocol' is explicitly added
+              to the `packages` configuration field.
+      
+              Alternatively, you can also rely on setuptools' discovery methods
+              (for example by using `find_namespace_packages(...)`/`find_namespace:`
+              instead of `find_packages(...)`/`find:`).
+      
+              You can read more about "package discovery" on setuptools documentation page:
+      
+              - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+      
+              If you don't want 'asyncpg.protocol' to be distributed and are
+              already explicitly excluding 'asyncpg.protocol' via
+              `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+              you can try to use `exclude_package_data`, or `include-package-data=False` in
+              combination with a more fine grained `package-data` configuration.
+      
+              You can read more about "package data files" on setuptools documentation page:
+      
+              - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+      
+      
+              [^1]: For Python, any directory (with suitable naming) can be imported,
+                    even if it does not contain any `.py` files.
+                    On the other hand, currently there is no concept of package data
+                    directory, all directories are treated like packages.
+              ********************************************************************************
+      
+      !!
+        check.warn(importable)
+      C:\Users\ASUS\AppData\Local\Temp\pip-build-env-23lgek5o\overlay\Lib\site-packages\setuptools\command\build_py.py:215: _Warning: Package 'asyncpg.protocol.record' is absent from the `packages` configuration.
+      !!
+      
+              ********************************************************************************
+              ############################
+              # Package would be ignored #
+              ############################
+              Python recognizes 'asyncpg.protocol.record' as an importable package[^1],
+              but it is absent from setuptools' `packages` configuration.
+      
+              This leads to an ambiguous overall configuration. If you want to distribute this
+              package, please make sure that 'asyncpg.protocol.record' is explicitly added
+              to the `packages` configuration field.
+      
+              Alternatively, you can also rely on setuptools' discovery methods
+              (for example by using `find_namespace_packages(...)`/`find_namespace:`
+              instead of `find_packages(...)`/`find:`).
+      
+              You can read more about "package discovery" on setuptools documentation page:
+      
+              - https://setuptools.pypa.io/en/latest/userguide/package_discovery.html
+      
+              If you don't want 'asyncpg.protocol.record' to be distributed and are
+              already explicitly excluding 'asyncpg.protocol.record' via
+              `find_namespace_packages(...)/find_namespace` or `find_packages(...)/find`,
+              you can try to use `exclude_package_data`, or `include-package-data=False` in
+              combination with a more fine grained `package-data` configuration.
+      
+              You can read more about "package data files" on setuptools documentation page:
+      
+              - https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+      
+      
+              [^1]: For Python, any directory (with suitable naming) can be imported,
+                    even if it does not contain any `.py` files.
+                    On the other hand, currently there is no concept of package data
+                    directory, all directories are treated like packages.
+              ********************************************************************************
+      
+      !!
+        check.warn(importable)
+      copying asyncpg\pgproto\__init__.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\buffer.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\buffer.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\consts.pxi -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\cpythonx.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\debug.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\frb.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\frb.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\hton.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\pgproto.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\pgproto.pyi -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\pgproto.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\tohex.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\pgproto\uuid.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto
+      copying asyncpg\protocol\consts.pxi -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\coreproto.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\coreproto.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\cpythonx.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\encodings.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\pgtypes.pxi -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\prepared_stmt.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\prepared_stmt.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\protocol.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\protocol.pyi -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\protocol.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\scram.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\scram.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\settings.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      copying asyncpg\protocol\settings.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol
+      creating build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\__init__.pxd -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\bits.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\bytea.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\context.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\datetime.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\float.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\geometry.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\hstore.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\int.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\json.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\jsonpath.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\misc.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\network.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\numeric.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\pg_snapshot.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\text.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\tid.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\pgproto\codecs\uuid.pyx -> build\lib.win-amd64-cpython-314\asyncpg\pgproto\codecs
+      copying asyncpg\protocol\codecs\array.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\base.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\base.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\pgproto.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\range.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\record.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      copying asyncpg\protocol\codecs\textutils.pyx -> build\lib.win-amd64-cpython-314\asyncpg\protocol\codecs
+      creating build\lib.win-amd64-cpython-314\asyncpg\protocol\record
+      copying asyncpg\protocol\record\__init__.pxd -> build\lib.win-amd64-cpython-314\asyncpg\protocol\record
+      running build_ext
+      building 'asyncpg.pgproto.pgproto' extension
+      error: Microsoft Visual C++ 14.0 or greater is required. Get it with "Microsoft C++ Build Tools": https://visualstudio.microsoft.com/visual-cpp-build-tools/
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  ERROR: Failed building wheel for asyncpg
+
+[notice] A new release of pip is available: 25.3 -> 26.2.1
+[notice] To update, run: D:\IP-Shakti\apps\api\.venv\Scripts\python.exe -m pip install --upgrade pip
+error: failed-wheel-build-for-install
+
+× Failed to build installable wheels for some pyproject.toml based projects
+╰─> asyncpg
