@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Env
+.env
+.env.local
+
+# Corpus (raw sources, gitignored per CLAUDE.md)
+/corpus/raw/*
+!/corpus/raw/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
