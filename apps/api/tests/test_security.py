@@ -1,6 +1,6 @@
 """Tests for security functions: password hashing and JWT encoding/decoding."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from jose import JWTError, jwt
@@ -36,6 +36,18 @@ class TestPasswordHashing:
         hashed = hash_password(password)
         wrong_password = "wrong-password"
         assert verify_password(wrong_password, hashed) is False
+
+    def test_hash_password_too_long_raises(self):
+        """A password over bcrypt's 72-byte limit raises rather than 500ing later."""
+        too_long = "a" * 73
+        with pytest.raises(ValueError):
+            hash_password(too_long)
+
+    def test_verify_password_too_long_returns_false(self):
+        """An over-length login attempt fails cleanly instead of raising."""
+        hashed = hash_password("a-normal-password")
+        too_long = "a" * 73
+        assert verify_password(too_long, hashed) is False
 
     def test_hash_password_round_trip_multiple(self):
         """Multiple hashes of the same password should verify correctly."""
@@ -77,8 +89,8 @@ class TestJWTToken:
 
         assert "exp" in payload
         # exp should be in the future (within reasonable bounds)
-        now = datetime.utcnow()
-        exp_time = datetime.utcfromtimestamp(payload["exp"])
+        now = datetime.now(timezone.utc)
+        exp_time = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
         # Should expire in approximately jwt_expire_minutes minutes
         min_expected = now + timedelta(minutes=settings.jwt_expire_minutes - 1)
         max_expected = now + timedelta(minutes=settings.jwt_expire_minutes + 1)
@@ -93,7 +105,7 @@ class TestJWTToken:
     def test_decode_expired_token_raises(self):
         """Decoding an expired token should raise an exception."""
         # Create an already-expired token using jose.jwt.encode directly
-        past_time = datetime.utcnow() - timedelta(minutes=5)
+        past_time = datetime.now(timezone.utc) - timedelta(minutes=5)
         expired_payload = {
             "sub": "user123",
             "role": "user",

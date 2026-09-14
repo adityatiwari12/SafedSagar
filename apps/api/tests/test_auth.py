@@ -1,6 +1,11 @@
 """Tests for /auth/register, /auth/login, /auth/me."""
 
 import uuid
+from datetime import datetime, timedelta, timezone
+
+from jose import jwt
+
+from app.config import settings
 
 
 async def test_register_login_me_round_trip(client):
@@ -27,6 +32,8 @@ async def test_register_login_me_round_trip(client):
     assert me_resp.status_code == 200
     assert me_resp.json()["email"] == email
     assert me_resp.json()["role"] == "user"
+    assert "hashed_password" not in me_resp.json()
+    assert "password" not in me_resp.json()
 
 
 async def test_login_wrong_password_401(client, make_user):
@@ -38,9 +45,55 @@ async def test_login_wrong_password_401(client, make_user):
     assert resp.status_code == 401
 
 
+async def test_login_nonexistent_email_401(client):
+    resp = await client.post(
+        "/auth/login",
+        data={"username": f"{uuid.uuid4()}@example.test", "password": "whatever123"},
+    )
+    assert resp.status_code == 401
+
+
+async def test_register_password_too_long_422(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register", json={"email": email, "password": "a" * 73}
+    )
+    assert resp.status_code == 422
+
+
+async def test_register_password_too_short_422(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register", json={"email": email, "password": "short"}
+    )
+    assert resp.status_code == 422
+
+
+async def test_me_garbage_token_401(client):
+    resp = await client.get(
+        "/auth/me", headers={"Authorization": "Bearer not.a.valid.token"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_me_expired_token_401(client, make_user):
+    email, _password, _token = await make_user()
+    past = datetime.now(timezone.utc) - timedelta(minutes=5)
+    expired_token = jwt.encode(
+        {"sub": email, "role": "user", "exp": int(past.timestamp())},
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    resp = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {expired_token}"}
+    )
+    assert resp.status_code == 401
+
+
 async def test_register_duplicate_email_400(client):
     email = f"{uuid.uuid4()}@example.test"
-    await client.post("/auth/register", json={"email": email, "password": "pw12345"})
+    await client.post("/auth/register", json={"email": email, "password": "pw1234567"})
 
     resp = await client.post(
         "/auth/register", json={"email": email, "password": "another-pw"}

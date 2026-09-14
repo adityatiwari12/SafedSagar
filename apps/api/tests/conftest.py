@@ -39,7 +39,8 @@ async def client():
 @pytest.fixture
 async def make_user():
     """Factory fixture: insert a user with a given role directly (bypasses
-    /auth/register, which always forces role=user) and return (user, token).
+    /auth/register, which always forces role=user) and return
+    (email, password, token).
 
     Facilitator/Admin accounts have no self-registration path per the RBAC
     spec, so tests that need one create it directly against the DB, the

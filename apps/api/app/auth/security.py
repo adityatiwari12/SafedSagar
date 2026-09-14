@@ -1,11 +1,13 @@
 """Password hashing and JWT token management."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import jwt
 
 from app.config import settings
+
+_BCRYPT_MAX_BYTES = 72
 
 
 def hash_password(password: str) -> str:
@@ -17,8 +19,11 @@ def hash_password(password: str) -> str:
     Returns:
         The hashed password string.
     """
+    encoded = password.encode()
+    if len(encoded) > _BCRYPT_MAX_BYTES:
+        raise ValueError(f"password must be at most {_BCRYPT_MAX_BYTES} bytes")
     salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode(), salt)
+    hashed = bcrypt.hashpw(encoded, salt)
     return hashed.decode()
 
 
@@ -32,7 +37,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if the password matches, False otherwise.
     """
-    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    encoded = plain_password.encode()
+    if len(encoded) > _BCRYPT_MAX_BYTES:
+        # A password this long can never match a hash created under
+        # hash_password's 72-byte limit - reject without hitting bcrypt's
+        # own hard ValueError, so an over-length login attempt gets a
+        # normal 401 (via the caller) instead of a 500.
+        return False
+    return bcrypt.checkpw(encoded, hashed_password.encode())
 
 
 def create_access_token(user_id: str, role: str) -> str:
@@ -45,7 +57,7 @@ def create_access_token(user_id: str, role: str) -> str:
     Returns:
         The encoded JWT token as a string.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=settings.jwt_expire_minutes)
     payload = {
         "sub": user_id,

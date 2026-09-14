@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, get_db
@@ -29,7 +30,17 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
         role=UserRole.user,
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        # The pre-check above has a race window between two concurrent
+        # registrations for the same email; the unique constraint is the
+        # real guard, this just keeps the response a 400 instead of 500.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        ) from exc
     await db.refresh(user)
     return user
 
