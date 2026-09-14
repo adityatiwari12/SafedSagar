@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 .pytest_cache/
+pip-install*.log
 
 # Node
 node_modules/
