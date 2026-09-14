@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ipsakti-postgres
+    environment:
+      POSTGRES_DB: ipsakti
+      POSTGRES_USER: ipsakti
+      POSTGRES_PASSWORD: ipsakti-dev-pwd
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ipsakti"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ipsakti-chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadb_data:/chroma/data
+
+volumes:
+  postgres_data:
+  chromadb_data:
