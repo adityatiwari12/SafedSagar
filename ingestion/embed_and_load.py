@@ -15,6 +15,7 @@ from pathlib import Path
 
 import httpx
 import yaml
+from sqlalchemy import delete
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "apps" / "api"))
@@ -39,6 +40,13 @@ def _as_date(value: str | None) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
+def _clean_text(value: str | None) -> str:
+    """Postgres UTF-8 rejects NUL bytes that some PDF extractors emit."""
+    if not value:
+        return ""
+    return value.replace("\x00", "")
+
+
 def _chunk_id(doc_id: str, index: int, section_or_article: str | None) -> str:
     if section_or_article:
         safe_label = _SLUG_SAFE_RE.sub("-", section_or_article).strip("-")
@@ -46,14 +54,19 @@ def _chunk_id(doc_id: str, index: int, section_or_article: str | None) -> str:
     return f"{doc_id}#chunk-{index:04d}"
 
 
-def embed_texts(texts: list[str], client: httpx.Client) -> list[list[float]]:
-    resp = client.post(
-        OLLAMA_EMBED_URL,
-        json={"model": OLLAMA_EMBED_MODEL, "input": texts},
-        timeout=60.0,
-    )
-    resp.raise_for_status()
-    return resp.json()["embeddings"]
+def embed_texts(texts: list[str], client: httpx.Client, batch_size: int = 32) -> list[list[float]]:
+    """Embed texts in batches — large Acts exceed Ollama's single-request limit."""
+    all_embeddings: list[list[float]] = []
+    for start in range(0, len(texts), batch_size):
+        batch = texts[start : start + batch_size]
+        resp = client.post(
+            OLLAMA_EMBED_URL,
+            json={"model": OLLAMA_EMBED_MODEL, "input": batch},
+            timeout=120.0,
+        )
+        resp.raise_for_status()
+        all_embeddings.extend(resp.json()["embeddings"])
+    return all_embeddings
 
 
 def get_or_create_collection(client: httpx.Client, name: str) -> str:
@@ -77,17 +90,21 @@ def chroma_upsert(
     embeddings: list[list[float]],
     documents: list[str],
     metadatas: list[dict],
+    batch_size: int = 100,
 ) -> None:
-    resp = client.post(
-        f"{CHROMA_BASE_URL}/collections/{collection_id}/upsert",
-        json={
-            "ids": ids,
-            "embeddings": embeddings,
-            "documents": documents,
-            "metadatas": metadatas,
-        },
-    )
-    resp.raise_for_status()
+    for start in range(0, len(ids), batch_size):
+        end = start + batch_size
+        resp = client.post(
+            f"{CHROMA_BASE_URL}/collections/{collection_id}/upsert",
+            json={
+                "ids": ids[start:end],
+                "embeddings": embeddings[start:end],
+                "documents": documents[start:end],
+                "metadatas": metadatas[start:end],
+            },
+            timeout=120.0,
+        )
+        resp.raise_for_status()
 
 
 async def load_document(
@@ -104,33 +121,41 @@ async def load_document(
     chroma_metadatas: list[dict] = []
 
     async with AsyncSessionLocal() as session:
+        # Drop prior rows for this doc so a failed mid-doc load cannot leave
+        # half-written chunks that confuse merge/autoflush on retry.
+        await session.execute(
+            delete(SourceDocument).where(SourceDocument.doc_id == doc_id)
+        )
+
         for i, (chunk, vector) in enumerate(zip(chunks, embeddings)):
-            row_id = _chunk_id(doc_id, i, chunk["section_or_article"])
+            section = _clean_text(chunk.get("section_or_article")) or None
+            source_text = _clean_text(chunk["source_text"])
+            row_id = _chunk_id(doc_id, i, section)
             row = SourceDocument(
                 id=row_id,
                 doc_id=doc_id,
-                title=entry["title"],
-                authority=entry["authority"],
+                title=_clean_text(entry["title"]),
+                authority=_clean_text(entry["authority"]),
                 jurisdiction=Jurisdiction(entry["jurisdiction"]),
                 doc_type=entry["doc_type"],
                 effective_date=_as_date(entry.get("effective_date")),
                 version=entry.get("version"),
-                section_or_article=chunk["section_or_article"],
+                section_or_article=section,
                 source_url=entry["source_url"],
                 last_verified_date=_as_date(entry.get("last_verified_date")),
-                source_text=chunk["source_text"],
+                source_text=source_text,
             )
             await session.merge(row)
 
             chroma_ids.append(row_id)
             chroma_embeddings.append(vector)
-            chroma_documents.append(chunk["source_text"])
+            chroma_documents.append(source_text)
             chroma_metadatas.append(
                 {
                     "doc_id": doc_id,
                     "jurisdiction": entry["jurisdiction"],
                     "doc_type": entry["doc_type"],
-                    "section_or_article": chunk["section_or_article"] or "",
+                    "section_or_article": section or "",
                 }
             )
         await session.commit()
@@ -141,10 +166,17 @@ async def load_document(
     return len(chunks)
 
 
-async def run(registry_path: Path, raw_dir: Path) -> None:
+async def run(
+    registry_path: Path,
+    raw_dir: Path,
+    only: list[str] | None = None,
+) -> None:
     sources = yaml.safe_load(registry_path.read_text(encoding="utf-8"))["sources"]
+    if only:
+        wanted = set(only)
+        sources = [s for s in sources if s["doc_id"] in wanted]
 
-    with httpx.Client(timeout=30.0) as http_client:
+    with httpx.Client(timeout=120.0) as http_client:
         collection_id = get_or_create_collection(http_client, CHROMA_COLLECTION)
 
         for entry in sources:
@@ -169,6 +201,7 @@ async def run(registry_path: Path, raw_dir: Path) -> None:
         "BM25 cache is rebuilt from the new SourceDocument rows."
     )
 
+
 if __name__ == "__main__":
     import asyncio
 
@@ -176,9 +209,15 @@ if __name__ == "__main__":
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY)
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--skip-fetch", action="store_true", help="assume raw files already downloaded")
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        help="Load only this doc_id (repeatable); default = all registry entries",
+    )
     args = parser.parse_args()
 
     if not args.skip_fetch:
         fetch_all(args.registry, args.raw_dir)
 
-    asyncio.run(run(args.registry, args.raw_dir))
+    asyncio.run(run(args.registry, args.raw_dir, only=args.only or None))
