@@ -143,9 +143,19 @@ def reason_and_cite(state: GraphState) -> dict:
     # reason_and_cite prompt (chunks + conversation history) is much longer,
     # so give it real headroom instead of racing the default 120s budget.
     timeout = 240.0 if reasoning_model else 120.0
+    # Reasoning-effort tuning for a thinking model, verified live
+    # (2026-09-15): "low" cut a trivial warm call from ~44s to ~3.5s (still
+    # valid JSON - unlike `think: false`, which breaks JSON validity
+    # entirely). On the full multi-chunk prompt it still costs ~55s since
+    # CPU token decode itself dominates once the answer is long, but it's
+    # consistently faster than the unset default. keep_alive avoids paying
+    # gpt-oss:20b's ~20-40s disk reload on every turn of a conversation
+    # with gaps between messages.
+    think = "low" if reasoning_model else None
+    keep_alive = "30m" if reasoning_model else None
 
     def _generate() -> dict:
-        return generate_json(prompt, timeout, provider=provider, model=reasoning_model)
+        return generate_json(prompt, timeout, provider=provider, model=reasoning_model, think=think, keep_alive=keep_alive)
 
     # Small local models occasionally emit malformed JSON, especially on
     # longer prompts (e.g. once conversation history is folded into the
