@@ -29,7 +29,7 @@ def parse_pdf(raw_path: Path) -> str:
             f"across {len(pages_text)} pages - likely a scanned image PDF "
             f"with no usable text layer (OCR not implemented)."
         )
-    return "\n\n".join(pages_text)
+    return "\n\n".join(pages_text).replace("\x00", "")
 
 
 def parse_html(raw_path: Path) -> str:
