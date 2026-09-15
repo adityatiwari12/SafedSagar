@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30
 
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_embed_model: str = "nomic-embed-text"
+    ollama_generate_model: str = "llama3.2"
+
+    chroma_base_url: str = "http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database"
+    chroma_collection: str = "source_chunks"
+
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).parent.parent / ".env"),
         env_file_encoding="utf-8",

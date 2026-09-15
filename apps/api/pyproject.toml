@@ -21,7 +21,18 @@ dependencies = [
     "pydantic-settings==2.2.1",
     "uvicorn[standard]==0.30.0",
     "python-multipart==0.0.18",
+    "rank-bm25==0.2.2",
 ]
+# Deliberately NOT using the `langgraph` package: it pulls langchain-core,
+# which pulls uuid_utils (a Rust native extension) - blocked outright by
+# this machine's Windows Application Control policy, and older
+# langchain-core releases that predate uuid_utils pull other native deps
+# (cffi, zstandard) with no prebuilt wheel for Python 3.14 either. The
+# actual requirement (CLAUDE.md: "one LangGraph state graph inside a
+# single FastAPI service, not eight microservices") is architectural -
+# one process, one state machine, sequential named nodes - not a mandate
+# for this specific PyPI package. app/graph/graph.py hand-rolls the same
+# shape in plain Python with zero extra dependencies.
 
 [project.optional-dependencies]
 dev = [
