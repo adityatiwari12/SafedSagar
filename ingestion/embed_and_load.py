@@ -164,6 +164,10 @@ async def run(registry_path: Path, raw_dir: Path) -> None:
             n = await load_document(doc_id, entry, chunks, embeddings, http_client, collection_id)
             print(f"[done]  {doc_id}: {n} rows written")
 
+    print(
+        "[note] Restart the API process after re-ingest so its in-process "
+        "BM25 cache is rebuilt from the new SourceDocument rows."
+    )
 
 if __name__ == "__main__":
     import asyncio
