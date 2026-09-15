@@ -13,7 +13,7 @@ export function LanguageSwitcher({
       <button
         type="button"
         className={`rounded-sm px-2 py-1 font-medium ${
-          value === 'en' ? 'bg-primary text-white' : 'bg-white text-ink hover:bg-surface-muted'
+          value === 'en' ? 'bg-saffron text-white' : 'bg-white text-ink hover:bg-surface-muted'
         }`}
         aria-pressed={value === 'en'}
         onClick={() => onChange('en')}

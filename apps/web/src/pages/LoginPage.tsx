@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
 
   if (status === 'authenticated' && user) {
-    return <Navigate to={user.role === 'user' ? '/' : '/placeholder'} replace />
+    return <Navigate to={user.role === 'user' ? '/ask' : '/placeholder'} replace />
   }
 
   async function onSubmit(e: FormEvent) {
@@ -21,7 +21,7 @@ export default function LoginPage() {
     setError(null)
     try {
       await login(email.trim(), password)
-      navigate('/')
+      navigate('/ask')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed')
     } finally {

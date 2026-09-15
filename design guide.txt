@@ -1,0 +1,211 @@
+DESIGN DIRECTION
+Create IP-SAKTI Sahayak as a modern Government of India / Ministry of Ayush-style public-service portal. The design should feel official, trustworthy, accessible, information-rich and institutional rather than like a commercial AI SaaS product. Take visual inspiration from Indian government websites while keeping the interface original and clearly branded as an SIH prototype.
+
+DESIGN SYSTEM
+- Primary: Government-style saffron/orange
+- Secondary: Ayurveda-inspired deep green
+- Supporting: Navy blue, charcoal, white, light grey
+- Background: predominantly white/off-white
+- Use thin grey borders, subtle shadows and restrained rounded corners.
+- Avoid gradients, glassmorphism, neon colors and excessive animations.
+- Use consistent 8px spacing increments.
+- Use 12–16px card padding and generous section spacing.
+- Icons should be simple, flat, line-based and professional.
+- Use subtle Indian/Ayurvedic visual motifs such as leaves, manuscripts, herbs and traditional patterns without making the interface ornamental.
+
+TYPOGRAPHY
+- Use Noto Sans as the primary typeface.
+- Use Noto Sans Devanagari for Hindi and Indian-language content.
+- Headings: bold, high-contrast, institutional.
+- Body: clean, highly readable, 16–18px.
+- Navigation: 14–15px, medium weight.
+- Avoid futuristic AI fonts.
+- Maintain strong typographic hierarchy using size, weight and spacing rather than excessive colors.
+
+HEADER
+Create a Government of India-style header:
+1. Top utility bar:
+   Government of India | Skip to Main Content | Screen Reader Access | A- A A+ | हिन्दी | English
+2. Ministry identity:
+   Ashoka emblem + MINISTRY OF AYUSH / Government of India
+3. IP-SAKTI Sahayak identity on the right.
+4. Main navigation:
+   Home | About | Services | IP & Ayurveda | Knowledge Centre | Resources | FAQ | Contact
+5. Search and prominent “Ask IP-SAKTI” action.
+
+HERO CONTENT
+Headline:
+“IP-SAKTI Sahayak”
+
+Subheading:
+“Multilingual AI assistance for Intellectual Property and regulatory guidance in Ayurveda.”
+
+Supporting text:
+“Understand IP protection, regulatory requirements, Traditional Knowledge and biodiversity obligations through authoritative, source-cited information.”
+
+Primary CTA:
+“Ask IP-SAKTI”
+
+Secondary CTA:
+“Explore Knowledge Centre”
+
+Hero visual should show a realistic government-style IP-SAKTI interface with:
+- User question
+- Product classification
+- India / International jurisdiction
+- AI-generated guidance
+- Exact source citations
+- Confidence indicator
+
+CONTENT HIERARCHY
+Follow this order:
+1. Government header
+2. Hero / primary service
+3. About IP-SAKTI
+4. Who can use it
+5. Services
+6. How it works
+7. Authoritative sources
+8. India vs International
+9. Try IP-SAKTI / sample questions
+10. Multilingual capability
+11. Knowledge Centre
+12. Latest updates
+13. Disclaimer
+14. Footer
+
+ABOUT SECTION
+Explain that Ayurveda involves traditional knowledge, biological resources and modern innovation, creating interconnected IP, regulatory and biodiversity requirements.
+
+Position IP-SAKTI as a source-grounded decision-support assistant that helps users navigate these requirements.
+
+USER GROUPS
+Create cards for:
+- AYUSH Practitioners
+- Researchers
+- AYUSH Startups & MSMEs
+- Cultivators
+- Manufacturers
+- Exporters
+
+SERVICES
+Use a government-style service grid:
+- Patents
+- Trademarks
+- Geographical Indications
+- Copyright
+- Designs
+- Trade Secrets
+- Traditional Knowledge
+- Biodiversity & ABS
+- Ayurveda Regulatory Guidance
+- International IP & Regulatory Guidance
+- Prior-Art Assistance
+
+HOW IT WORKS
+Show a clear five-step visual process:
+
+ASK → CLASSIFY → RETRIEVE → VERIFY → GUIDE
+
+Descriptions:
+1. Ask — User describes an invention, formulation or regulatory question.
+2. Classify — Identify product category, IP type and jurisdiction.
+3. Retrieve — Retrieve relevant authoritative sources.
+4. Verify — Validate evidence and citations.
+5. Guide — Provide structured guidance with sources, confidence and limitations.
+
+SOURCE-GROUNDED AI
+Make this a major trust section.
+
+Headline:
+“Grounded in Authoritative Sources”
+
+Show source cards for:
+- IP India
+- Ministry of Ayush
+- National Biodiversity Authority
+- FSSAI
+- WIPO
+- WTO / TRIPS
+- CBD
+- Nagoya Protocol
+- Official registries
+
+Each source card should show authority, document type, relevant provision and “View Source”.
+
+INDIA / INTERNATIONAL
+Use a two-column comparison:
+INDIA:
+Patents, GI, Trademarks, AYUSH regulations, Biodiversity/ABS, FSSAI, Traditional Knowledge.
+
+INTERNATIONAL:
+WIPO, TRIPS, PCT, CBD, Nagoya Protocol and country-specific requirements.
+
+Clearly communicate “Jurisdiction-Aware Guidance”.
+
+AI INTERACTION
+Include an embedded “Try IP-SAKTI” component with sample questions:
+- “Can I patent a classical Ayurvedic formulation?”
+- “What IP protection is suitable for my herbal brand?”
+- “Does my product involve biodiversity or ABS requirements?”
+- “What should I consider before exporting an Ayurvedic product?”
+
+MULTILINGUAL
+Show:
+“Ask in the language you are comfortable with.”
+
+Provide language chips without claiming unsupported languages. Design the system to support future BHASHINI integration.
+
+KNOWLEDGE CENTRE
+Government-style resource cards:
+- Acts & Rules
+- Regulations & Notifications
+- International Frameworks
+- Traditional Knowledge
+- Prior Art
+- Official Registries
+
+LATEST UPDATES
+Use a government notification/news layout with:
+Date | Category | Short title | Read More
+
+DISCLAIMER
+Clearly state:
+“IP-SAKTI Sahayak provides information and decision-support based on available authoritative sources. It does not provide legal advice or replace qualified legal or regulatory professionals.”
+
+FOOTER
+Include:
+- About
+- Services
+- Knowledge Centre
+- Resources
+- Important Links
+- Accessibility
+- Privacy
+- Disclaimer
+- Sitemap
+
+Add:
+“SIH 2026 Prototype”
+and clearly avoid implying that this prototype is an officially operated Government of India service unless authorized.
+
+INTERACTION & UX
+- Keep animations subtle and purposeful.
+- Buttons should have clear hover/focus states.
+- Ensure keyboard navigation and accessibility.
+- Make citations clickable.
+- Use sticky navigation on desktop.
+- Make the Ask IP-SAKTI CTA consistently visible.
+- Fully responsive for desktop, tablet and mobile.
+- Prioritize readability and trust over visual effects.
+
+IMPORTANT CODE NOTES
+- Build reusable components rather than one large page.
+- Create a central design-token system for colors, spacing, typography, borders and shadows.
+- Keep content separate from UI components where practical.
+- Do not hardcode API keys or sensitive information.
+- Use placeholder/demo data clearly where backend functionality is not yet connected.
+- Do not fabricate government notifications, legal provisions, statistics or source URLs.
+- Do not use copyrighted Government of India branding in a way that implies official ownership or endorsement.
+- The landing page should visually resemble a government public-service portal, but IP-SAKTI Sahayak must remain clearly identifiable as the SIH prototype.
+- The overall impression should be: TRUST + AYURVEDA + GOVERNMENT INFORMATION PORTAL + SOURCE-GROUNDED AI.

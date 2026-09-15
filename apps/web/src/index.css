@@ -3,35 +3,42 @@
 @tailwind utilities;
 
 :root {
-  --ux4g-primary: #0d6efd;
-  --ux4g-primary-dark: #0a58ca;
-  --goi-saffron: #ff9933;
-  --goi-green: #138808;
-  --goi-navy: #0b1f3a;
-  --focus-ring: #0d6efd;
+  --ivory: #f7f3ea;
+  --forest: #0a3d2e;
+  --forest-mid: #0f5c45;
+  --saffron: #ff671f;
+  --saffron-deep: #d35400;
+  --gold: #b08d57;
+  --navy: #0b1f3a;
+  --ink: #1c2421;
+  --border: #ddd5c4;
+  --focus-ring: #ff671f;
 }
 
 @layer base {
   html {
-    @apply scroll-smooth;
+    scroll-behavior: smooth;
   }
-
   body {
-    @apply bg-surface-muted font-sans text-ink antialiased;
+    margin: 0;
+    font-family: 'Noto Sans', system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+    background: var(--ivory);
+    -webkit-font-smoothing: antialiased;
   }
-
   :focus-visible {
     outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }
-
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      animation: none !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
     }
   }
 }
@@ -40,52 +47,196 @@
   .tricolor-bar {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    height: 4px;
+    height: 3px;
   }
-
   .tricolor-bar > :nth-child(1) {
-    background: var(--goi-saffron);
+    background: #ff9933;
   }
   .tricolor-bar > :nth-child(2) {
-    background: #ffffff;
+    background: #fff;
   }
   .tricolor-bar > :nth-child(3) {
-    background: var(--goi-green);
+    background: #138808;
   }
 
+  .gov-btn-primary,
+  .gov-btn-secondary,
+  .gov-btn-outline-light,
+  .gov-btn-danger,
   .gov-btn {
-    @apply inline-flex items-center justify-center rounded-sm px-4 py-2 text-sm font-semibold transition-colors;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    padding: 0.85rem 1.35rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-
   .gov-btn-primary {
-    @apply gov-btn bg-primary text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50;
+    background: var(--saffron);
+    color: #fff;
+    border: 0;
   }
-
+  .gov-btn-primary:hover {
+    background: var(--saffron-deep);
+  }
+  .gov-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .gov-btn-secondary {
-    @apply gov-btn border border-surface-border bg-white text-ink hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50;
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--border);
   }
-
+  .gov-btn-secondary:hover {
+    background: var(--ivory);
+  }
+  .gov-btn-outline-light {
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+  }
+  .gov-btn-outline-light:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
   .gov-btn-danger {
-    @apply gov-btn border border-red-700 bg-white text-red-800 hover:bg-red-50;
+    background: #fff;
+    color: #991b1b;
+    border: 1px solid #b91c1c;
+  }
+  .gov-btn-danger:hover {
+    background: #fef2f2;
   }
 
   .gov-input {
-    @apply w-full rounded-sm border border-surface-border bg-white px-3 py-2 text-sm text-ink shadow-sm;
+    width: 100%;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: #fff;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
   }
-
   .gov-input:focus {
-    @apply border-primary;
+    border-color: var(--saffron);
+    outline: none;
   }
-
   .gov-label {
-    @apply mb-1 block text-sm font-semibold text-ink;
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
   }
-
   .gov-panel {
-    @apply rounded-sm border border-surface-border bg-white shadow-panel;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: #fff;
   }
 
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-sm focus:bg-primary focus:px-4 focus:py-2 focus:text-white;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+  .skip-link:focus {
+    left: 0.75rem;
+    top: 0.75rem;
+    z-index: 60;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    padding: 0.5rem 1rem;
+    background: var(--saffron);
+    color: #fff;
+  }
+
+  .evidence-line {
+    stroke: var(--saffron);
+    stroke-width: 2;
+    fill: none;
+    stroke-dasharray: 6 4;
+  }
+}
+
+/* Hard fallbacks — Vite HMR has dropped custom theme utilities after CSS errors */
+@layer utilities {
+  .bg-ivory {
+    background-color: var(--ivory);
+  }
+  .bg-ivory-deep {
+    background-color: #ede6d6;
+  }
+  .bg-forest {
+    background-color: var(--forest);
+  }
+  .bg-forest-mid {
+    background-color: var(--forest-mid);
+  }
+  .bg-navy {
+    background-color: var(--navy);
+  }
+  .bg-saffron {
+    background-color: var(--saffron);
+  }
+  .text-forest {
+    color: var(--forest);
+  }
+  .text-forest-mid {
+    color: var(--forest-mid);
+  }
+  .text-saffron {
+    color: var(--saffron);
+  }
+  .text-saffron-deep {
+    color: var(--saffron-deep);
+  }
+  .text-gold-soft {
+    color: #e2d0a8;
+  }
+  .text-ink {
+    color: var(--ink);
+  }
+  .text-ink-muted {
+    color: #4a5550;
+  }
+  .text-ink-faint {
+    color: #6e7873;
+  }
+  .text-ivory-deep {
+    color: #ede6d6;
+  }
+  .border-saffron {
+    border-color: var(--saffron);
+  }
+  .border-forest {
+    border-color: var(--forest);
+  }
+  .border-surface-border {
+    border-color: var(--border);
+  }
+  .max-w-portal {
+    max-width: 94rem;
+  }
+  .text-hero {
+    font-size: clamp(3rem, 7vw, 5.5rem);
+    line-height: 0.95;
+    font-weight: 800;
+  }
+  .text-section {
+    font-size: clamp(2rem, 4vw, 3.75rem);
+    line-height: 1.05;
+    font-weight: 700;
+  }
+  .shadow-lift {
+    box-shadow: 0 24px 60px rgba(10, 61, 46, 0.22);
+  }
+  .shadow-panel {
+    box-shadow: 0 1px 0 rgba(28, 36, 33, 0.06);
   }
 }

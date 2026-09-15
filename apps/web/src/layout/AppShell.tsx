@@ -7,7 +7,8 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 import { JurisdictionToggle } from './JurisdictionToggle'
 
 const CRUMBS: Record<string, string> = {
-  '/': 'Home / IP-SAKTI Sahayak',
+  '/': 'Home',
+  '/ask': 'Home / Ask IP-SAKTI',
   '/login': 'Home / Login',
   '/register': 'Home / Register',
   '/placeholder': 'Home / Role workspace',
@@ -57,7 +58,7 @@ export function AppShell({
               <p className="text-sm font-medium text-ink-muted" lang="hi">
                 आयुष मंत्रालय · भारत सरकार
               </p>
-              <Link to="/" className="mt-0.5 block text-xl font-bold text-navy hover:text-primary-dark sm:text-2xl">
+              <Link to="/" className="mt-0.5 block text-xl font-bold text-navy hover:text-saffron-deep sm:text-2xl">
                 IP-SAKTI Sahayak
               </Link>
               <p className="text-sm text-ink-muted">

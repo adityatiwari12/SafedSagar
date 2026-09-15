@@ -13,7 +13,7 @@ export function MessageBubble({
       <div
         className={`max-w-[min(100%,42rem)] rounded-sm px-4 py-3 text-sm leading-relaxed shadow-panel ${
           isUser
-            ? 'bg-primary text-white'
+            ? 'bg-saffron text-white'
             : 'border border-surface-border bg-white text-ink'
         }`}
       >

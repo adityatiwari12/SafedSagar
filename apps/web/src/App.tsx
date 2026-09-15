@@ -5,11 +5,13 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import RolePlaceholderPage from './pages/RolePlaceholderPage'
 import ChatPage from './chat/ChatPage'
+import LandingPage from './landing/LandingPage'
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
@@ -21,7 +23,7 @@ export default function App() {
           }
         />
         <Route
-          path="/"
+          path="/ask"
           element={
             <RequireAuth allow={['user']}>
               <ChatPage />

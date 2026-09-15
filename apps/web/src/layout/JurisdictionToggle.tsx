@@ -29,7 +29,7 @@ export function JurisdictionToggle({
         disabled={disabled}
         className={`px-3 py-1.5 text-sm font-semibold ${
           value === 'international'
-            ? 'bg-primary text-white'
+            ? 'bg-navy text-white'
             : 'text-ink hover:bg-surface-muted'
         }`}
         aria-pressed={value === 'international'}

@@ -12,7 +12,7 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false)
 
   if (status === 'authenticated' && user) {
-    return <Navigate to={user.role === 'user' ? '/' : '/placeholder'} replace />
+    return <Navigate to={user.role === 'user' ? '/ask' : '/placeholder'} replace />
   }
 
   async function onSubmit(e: FormEvent) {
@@ -21,7 +21,7 @@ export default function RegisterPage() {
     setError(null)
     try {
       await register(email.trim(), password)
-      navigate('/')
+      navigate('/ask')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Registration failed')
     } finally {
