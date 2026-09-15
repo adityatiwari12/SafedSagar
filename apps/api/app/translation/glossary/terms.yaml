@@ -1,0 +1,53 @@
+# Version-controlled multilingual legal-terminology glossary (task
+# Section 5). Every term here is protected from machine translation - MT
+# never sees the literal English string, only an opaque placeholder, so it
+# can't paraphrase or mistranslate it.
+#
+# `translations` starts empty for every language on every term: per Section
+# 5, "Never invent translations." An entry only gets a localized string
+# here once a qualified reviewer has vetted it (see
+# docs/multilingual-architecture.md#glossary). Until then, the term is
+# rendered in English inline in the localized answer - ambiguous but
+# correct beats fluent but wrong for a legal term.
+version: 1
+terms:
+  - en: "patent"
+    translations: {}
+  - en: "patentability"
+    translations: {}
+  - en: "prior art"
+    translations: {}
+  - en: "traditional knowledge"
+    translations: {}
+  - en: "biological resources"
+    translations: {}
+  - en: "ABS"
+    translations: {}
+  - en: "trademark"
+    translations: {}
+  - en: "GI"
+    translations: {}
+  - en: "copyright"
+    translations: {}
+  - en: "industrial design"
+    translations: {}
+  - en: "trade secret"
+    translations: {}
+  - en: "classical formulation"
+    translations: {}
+  - en: "proprietary medicine"
+    translations: {}
+  - en: "new drug"
+    translations: {}
+  - en: "phytopharmaceutical"
+    translations: {}
+  - en: "Ayurveda-Aahar"
+    translations: {}
+  - en: "jurisdiction"
+    translations: {}
+  - en: "claim"
+    translations: {}
+  - en: "compliance"
+    translations: {}
+  - en: "citation"
+    translations: {}

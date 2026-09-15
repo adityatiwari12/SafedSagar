@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     chroma_base_url: str = "http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database"
     chroma_collection: str = "source_chunks"
 
+    # IndicTrans2 sidecar (services/indictrans2-sidecar/) - a separate
+    # Python 3.12 process, since this venv's Python 3.14 has no PyTorch
+    # wheel on Windows. See app/translation/indictrans2_provider.py.
+    indictrans2_sidecar_url: str = "http://localhost:8600"
+
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).parent.parent / ".env"),
         env_file_encoding="utf-8",

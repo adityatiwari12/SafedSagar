@@ -22,6 +22,8 @@ dependencies = [
     "uvicorn[standard]==0.30.0",
     "python-multipart==0.0.18",
     "rank-bm25==0.2.2",
+    "py3langid==0.4.0",
+    "pyyaml==6.0.2",
 ]
 # Deliberately NOT using the `langgraph` package: it pulls langchain-core,
 # which pulls uuid_utils (a Rust native extension) - blocked outright by
