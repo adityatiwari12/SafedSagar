@@ -45,6 +45,65 @@ async def test_login_wrong_password_401(client, make_user):
     assert resp.status_code == 401
 
 
+async def test_register_default_role_is_user_approved(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post("/auth/register", json={"email": email, "password": "testpass123"})
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["role"] == "user"
+    assert body["verification_status"] == "approved"
+
+
+async def test_register_facilitator_request_lands_pending(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register",
+        json={"email": email, "password": "testpass123", "role": "facilitator"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["role"] == "facilitator"
+    assert body["verification_status"] == "pending"
+
+
+async def test_register_regulatory_expert_request_lands_pending(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register",
+        json={"email": email, "password": "testpass123", "role": "regulatory_expert"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["verification_status"] == "pending"
+
+
+async def test_register_admin_role_rejected_422(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register",
+        json={"email": email, "password": "testpass123", "role": "admin"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_register_persona_for_user_role(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register",
+        json={"email": email, "password": "testpass123", "role": "user", "persona": "cultivator"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["persona"] == "cultivator"
+
+
+async def test_register_invalid_persona_rejected_422(client):
+    email = f"{uuid.uuid4()}@example.test"
+    resp = await client.post(
+        "/auth/register",
+        json={"email": email, "password": "testpass123", "persona": "not-a-real-persona"},
+    )
+    assert resp.status_code == 422
+
+
 async def test_login_nonexistent_email_401(client):
     resp = await client.post(
         "/auth/login",

@@ -9,14 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user, get_db
 from app.auth.schemas import Token, UserCreate, UserOut
 from app.auth.security import create_access_token, hash_password, verify_password
-from app.db.models import User, UserRole
+from app.db.models import ROLES_REQUIRING_VERIFICATION, User, UserRole, VerificationStatus
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
-    """Self-register a new User-role account. Facilitator/Admin are seeded manually."""
+    """Self-register. `role` selects among the self-registerable set
+    (user/facilitator/regulatory_expert - UserCreate's validator already
+    rejects anything else, including admin). Facilitator/regulatory_expert
+    requests land pending until an admin approves; institutional_admin/
+    ministry_admin/kb_manager tiers do not exist as self-registerable
+    roles at all (see docs/product/rbac-architecture-and-ux-spec.md
+    Section 2 - admin stays a single seeded-only role for now)."""
     existing = await db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(
@@ -24,10 +30,17 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
             detail="Email already registered",
         )
 
+    role = UserRole(payload.role)
+    verification_status = (
+        VerificationStatus.pending if role in ROLES_REQUIRING_VERIFICATION else VerificationStatus.approved
+    )
+
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
-        role=UserRole.user,
+        role=role,
+        persona=payload.persona if role == UserRole.user else None,
+        verification_status=verification_status,
     )
     db.add(user)
     try:

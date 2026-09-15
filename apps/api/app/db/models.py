@@ -14,11 +14,42 @@ from app.db.base import Base
 
 
 class UserRole(str, enum.Enum):
-    """RBAC roles for platform users."""
+    """RBAC roles for platform users.
+
+    `admin` stays a single value for now (see
+    docs/product/rbac-architecture-and-ux-spec.md Section 0/"Open
+    decision" - splitting it into institutional_admin/ministry_admin/
+    kb_manager is a breaking migration that needs frontend coordination
+    first, deliberately not done in this change). `regulatory_expert` is
+    new: self-registerable-as-a-request, like `facilitator`, gated by
+    `verification_status`.
+    """
 
     user = "user"
     facilitator = "facilitator"
+    regulatory_expert = "regulatory_expert"
     admin = "admin"
+
+
+class VerificationStatus(str, enum.Enum):
+    """Gates facilitator/regulatory_expert dashboard access until an
+    admin approves their professional credentials. Meaningless for
+    `user`/`admin` (both default to `approved` - a plain user was never
+    unverified, and admin accounts are provisioned directly, never via
+    self-registration)."""
+
+    approved = "approved"
+    pending = "pending"
+    rejected = "rejected"
+
+
+# Roles a caller may request at self-registration. Admin is never in this
+# set - provisioned out-of-band only (see the ORM docstring above).
+SELF_REGISTERABLE_ROLES = {UserRole.user, UserRole.facilitator, UserRole.regulatory_expert}
+
+# Roles that land pending until an admin approves, rather than being
+# immediately active.
+ROLES_REQUIRING_VERIFICATION = {UserRole.facilitator, UserRole.regulatory_expert}
 
 
 class MessageRole(str, enum.Enum):
@@ -55,6 +86,17 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[UserRole] = mapped_column(
         SAEnum(UserRole, name="user_role"), nullable=False
+    )
+    # Only meaningful for role=user: entrepreneur | practitioner_researcher
+    # | cultivator - drives dashboard/intake framing, never permissions
+    # (CLAUDE.md: these personas "differ in intake context, not
+    # permissions"). Plain string, not an enum: it's profile data, not an
+    # RBAC-relevant value.
+    persona: Mapped[str | None] = mapped_column(String, nullable=True)
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        SAEnum(VerificationStatus, name="verification_status"),
+        nullable=False,
+        server_default=VerificationStatus.approved.value,
     )
     jurisdiction_preference: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
