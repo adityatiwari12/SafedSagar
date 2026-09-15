@@ -37,7 +37,14 @@ test('redirects to /login when unauthenticated', () => {
 
 test('renders children when authenticated and role allowed', () => {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
-    user: { id: '1', email: 'a@b.com', role: 'user', jurisdiction_preference: null },
+    user: {
+      id: '1',
+      email: 'a@b.com',
+      role: 'user',
+      persona: null,
+      verification_status: 'approved',
+      jurisdiction_preference: null,
+    },
     status: 'authenticated',
     login: vi.fn(),
     register: vi.fn(),
@@ -49,7 +56,14 @@ test('renders children when authenticated and role allowed', () => {
 
 test('redirects to /placeholder when role not allowed', () => {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
-    user: { id: '1', email: 'f@b.com', role: 'facilitator', jurisdiction_preference: null },
+    user: {
+      id: '1',
+      email: 'f@b.com',
+      role: 'facilitator',
+      persona: null,
+      verification_status: 'pending',
+      jurisdiction_preference: null,
+    },
     status: 'authenticated',
     login: vi.fn(),
     register: vi.fn(),

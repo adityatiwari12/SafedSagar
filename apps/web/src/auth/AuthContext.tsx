@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { authApi, UserProfile } from '../api/authApi'
+import { authApi, RegisterOptions, UserProfile } from '../api/authApi'
 import { ApiError } from '../api/http'
 
 const TOKEN_KEY = 'ipsakti_token'
@@ -10,7 +10,7 @@ interface AuthContextValue {
   user: UserProfile | null
   status: Status
   login(email: string, password: string): Promise<void>
-  register(email: string, password: string): Promise<void>
+  register(email: string, password: string, options?: RegisterOptions): Promise<void>
   logout(): void
 }
 
@@ -47,8 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authenticated')
   }
 
-  async function register(email: string, password: string) {
-    await authApi.register(email, password)
+  async function register(email: string, password: string, options?: RegisterOptions) {
+    await authApi.register(email, password, options)
     await login(email, password)
   }
 
