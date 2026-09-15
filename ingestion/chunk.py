@@ -17,6 +17,18 @@ _SECTION_MARKER_RE = re.compile(
     re.MULTILINE,
 )
 
+# Consolidated/annotated Acts print amendment-history footnotes at the
+# bottom of pages in the exact same "<number>. <text>" shape as a real
+# section marker ("5. Ins. by s. 4, ibid. (w.e.f. 20-5-2003)."). Left
+# unfiltered these get matched as section boundaries and mislabel the
+# real section text that follows - checked against a short window right
+# after the number since these footnotes are recognizable by their
+# standard Indian-drafting amendment vocabulary.
+_FOOTNOTE_MARKER_RE = re.compile(
+    r"^(Ins\.|Subs\.|Omitted|Added|Renumbered|Cl\.|Sub-s\.|Reference|Sections?\s+\d)",
+)
+_FOOTNOTE_LOOKAHEAD_CHARS = 20
+
 _MIN_SECTION_MATCHES = 5
 _MAX_SECTION_MULTIPLE = 3  # split a section further only past this x target_chars
 
@@ -68,7 +80,11 @@ def chunk_text(
     target_chars: int = 1500,
     overlap_chars: int = 200,
 ) -> list[dict]:
-    matches = list(_SECTION_MARKER_RE.finditer(full_text))
+    all_matches = list(_SECTION_MARKER_RE.finditer(full_text))
+    matches = [
+        m for m in all_matches
+        if not _FOOTNOTE_MARKER_RE.match(full_text[m.end() : m.end() + _FOOTNOTE_LOOKAHEAD_CHARS])
+    ]
 
     if len(matches) < _MIN_SECTION_MATCHES:
         return _sliding_window(full_text, target_chars, overlap_chars)
