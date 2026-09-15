@@ -7,6 +7,7 @@ import RolePlaceholderPage from './pages/RolePlaceholderPage'
 import CasesPage from './pages/CasesPage'
 import AdminPage from './pages/AdminPage'
 import ChatPage from './chat/ChatPage'
+import ClassificationWizard from './classify/ClassificationWizard'
 import LandingPage from './landing/LandingPage'
 
 export default function App() {
@@ -29,6 +30,14 @@ export default function App() {
           element={
             <RequireAuth allow={['user']}>
               <ChatPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/classify"
+          element={
+            <RequireAuth allow={['user']}>
+              <ClassificationWizard />
             </RequireAuth>
           }
         />

@@ -1,4 +1,5 @@
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { AppShell } from '../layout/AppShell'
 import { useChatSession } from './useChatSession'
 import { MessageBubble } from './MessageBubble'
@@ -16,6 +17,17 @@ const EXAMPLES = [
 export default function ChatPage() {
   const session = useChatSession()
   const [draft, setDraft] = useState('')
+  const location = useLocation()
+
+  useEffect(() => {
+    const seeded = (location.state as { seededDraft?: string } | null)?.seededDraft
+    if (seeded) {
+      setDraft(seeded)
+      // Clear so a page refresh / back-nav doesn't re-seed the draft.
+      window.history.replaceState({}, '')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const latestAssistant = useMemo(() => {
     for (let i = session.turns.length - 1; i >= 0; i -= 1) {
@@ -173,6 +185,12 @@ export default function ChatPage() {
                 <li>Review classification, citations &amp; action plan</li>
                 <li>Escalate if confidence is low</li>
               </ol>
+              <Link
+                to="/classify"
+                className="mt-3 inline-block text-sm font-semibold text-primary underline"
+              >
+                Not sure what category your product is? Use the classification wizard →
+              </Link>
             </section>
 
             <EscalateButton
