@@ -1,0 +1,60 @@
+import { render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { expect, test, vi } from 'vitest'
+import { RequireAuth } from './RequireAuth'
+import * as AuthContext from './AuthContext'
+
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/login" element={<div>login page</div>} />
+        <Route path="/placeholder" element={<div>placeholder page</div>} />
+        <Route
+          path="/"
+          element={
+            <RequireAuth allow={['user']}>
+              <div>protected content</div>
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+test('redirects to /login when unauthenticated', () => {
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+    user: null,
+    status: 'unauthenticated',
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  })
+  renderAt('/')
+  expect(screen.getByText('login page')).toBeInTheDocument()
+})
+
+test('renders children when authenticated and role allowed', () => {
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+    user: { id: '1', email: 'a@b.com', role: 'user', jurisdiction_preference: null },
+    status: 'authenticated',
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  })
+  renderAt('/')
+  expect(screen.getByText('protected content')).toBeInTheDocument()
+})
+
+test('redirects to /placeholder when role not allowed', () => {
+  vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
+    user: { id: '1', email: 'f@b.com', role: 'facilitator', jurisdiction_preference: null },
+    status: 'authenticated',
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  })
+  renderAt('/')
+  expect(screen.getByText('placeholder page')).toBeInTheDocument()
+})

@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ux4g-primary: #0d6efd;
+  --ux4g-primary-dark: #0a58ca;
+  --goi-saffron: #ff9933;
+  --goi-green: #138808;
+  --goi-navy: #0b1f3a;
+  --focus-ring: #0d6efd;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-surface-muted font-sans text-ink antialiased;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .tricolor-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    height: 4px;
+  }
+
+  .tricolor-bar > :nth-child(1) {
+    background: var(--goi-saffron);
+  }
+  .tricolor-bar > :nth-child(2) {
+    background: #ffffff;
+  }
+  .tricolor-bar > :nth-child(3) {
+    background: var(--goi-green);
+  }
+
+  .gov-btn {
+    @apply inline-flex items-center justify-center rounded-sm px-4 py-2 text-sm font-semibold transition-colors;
+  }
+
+  .gov-btn-primary {
+    @apply gov-btn bg-primary text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .gov-btn-secondary {
+    @apply gov-btn border border-surface-border bg-white text-ink hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .gov-btn-danger {
+    @apply gov-btn border border-red-700 bg-white text-red-800 hover:bg-red-50;
+  }
+
+  .gov-input {
+    @apply w-full rounded-sm border border-surface-border bg-white px-3 py-2 text-sm text-ink shadow-sm;
+  }
+
+  .gov-input:focus {
+    @apply border-primary;
+  }
+
+  .gov-label {
+    @apply mb-1 block text-sm font-semibold text-ink;
+  }
+
+  .gov-panel {
+    @apply rounded-sm border border-surface-border bg-white shadow-panel;
+  }
+
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-sm focus:bg-primary focus:px-4 focus:py-2 focus:text-white;
+  }
+}
