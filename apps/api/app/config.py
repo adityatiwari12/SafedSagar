@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     ollama_embed_model: str = "nomic-embed-text"
     ollama_generate_model: str = "llama3.2"
 
+    # Generation provider: "ollama" (default) or "cloud" (OpenAI-compatible).
+    llm_provider: str = "ollama"
+    # Optional override used only by reason_and_cite; classifiers stay on llm_provider.
+    llm_reasoning_provider: str | None = None
+    cloud_llm_base_url: str | None = None
+    cloud_llm_api_key: str | None = None
+    cloud_llm_model: str | None = None
+
     chroma_base_url: str = "http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database"
     chroma_collection: str = "source_chunks"
 

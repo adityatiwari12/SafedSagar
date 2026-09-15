@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 
 from app.graph.state import PRODUCT_CATEGORIES, GraphState
-from app.llm.ollama_client import generate_json
+from app.llm.generate import generate_json
 
 _PROMPT_TEMPLATE = """Classify the Ayurvedic product or innovation described \
 in the question below into exactly one of these categories:

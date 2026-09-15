@@ -8,15 +8,23 @@ from __future__ import annotations
 
 import json
 
+from app.config import settings
 from app.graph.state import Citation, GraphState
-from app.llm.ollama_client import generate_json
+from app.llm.generate import generate_json
 
 _PROMPT_TEMPLATE = """You are IP-SAKTI Sahayak, an assistant answering \
 Ayurveda intellectual-property and regulatory questions. You are NOT a \
 lawyer and must state this is information, not legal advice, when \
-relevant. Answer ONLY using the numbered source chunks below - if they \
-don't contain enough information to answer, say so plainly instead of \
-guessing.
+relevant.
+
+JURISDICTION FOR THIS ANSWER: {jurisdiction}
+Use ONLY the numbered source chunks below. Do not cite or invent \
+authority from any other jurisdiction. If the chunks are insufficient, \
+abstain plainly instead of guessing.
+
+If any chunk is from the WIPO GRATK treaty (doc_id containing \
+"gratk"), you MUST state it is signed but NOT YET IN FORCE / not \
+binding law.
 
 SOURCE CHUNKS:
 {chunks_block}
@@ -48,6 +56,7 @@ def _format_chunks(chunks: list[dict]) -> str:
 def reason_and_cite(state: GraphState) -> dict:
     chunks = state.get("reranked_chunks", [])
     question = state["question"]
+    jurisdiction = state.get("jurisdiction") or "unspecified"
 
     if not chunks:
         return {
@@ -56,11 +65,19 @@ def reason_and_cite(state: GraphState) -> dict:
             "raw_citations": [],
         }
 
-    prompt = _PROMPT_TEMPLATE.format(chunks_block=_format_chunks(chunks), question=question)
+    prompt = _PROMPT_TEMPLATE.format(
+        chunks_block=_format_chunks(chunks),
+        question=question,
+        jurisdiction=jurisdiction,
+    )
 
+    provider = settings.llm_reasoning_provider
     try:
-        result = generate_json(prompt)
-    except (json.JSONDecodeError, KeyError):
+        if provider:
+            result = generate_json(prompt, provider=provider)
+        else:
+            result = generate_json(prompt)
+    except (json.JSONDecodeError, KeyError, RuntimeError, ValueError):
         return {
             "answer": "The assistant could not produce a well-formed answer "
             "for this question. Please try rephrasing, or escalate to a "

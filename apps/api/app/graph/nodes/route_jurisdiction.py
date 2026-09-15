@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 
 from app.graph.state import GraphState
-from app.llm.ollama_client import generate_json
+from app.llm.generate import generate_json
 
 _VALID_JURISDICTIONS = {"india", "international"}
 
