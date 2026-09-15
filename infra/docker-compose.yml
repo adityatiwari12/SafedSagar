@@ -24,6 +24,17 @@ services:
     volumes:
       - chromadb_data:/chroma/data
 
+  indictrans2-sidecar:
+    build: ../services/indictrans2-sidecar
+    container_name: ipsakti-indictrans2-sidecar
+    ports:
+      - "8600:8600"
+    volumes:
+      # Persists the downloaded NLLB-200 model across container restarts -
+      # without this, every `docker compose up` re-downloads it (~2.4GB).
+      - indictrans2_models:/root/.cache/huggingface
+
 volumes:
   postgres_data:
   chromadb_data:
+  indictrans2_models:

@@ -1,0 +1,10 @@
+# Runs in the Dockerfile's Linux container - torch has no Windows wheel
+# for this machine's Python 3.14. See Dockerfile / README.md.
+#
+# torch is NOT listed here - the Dockerfile installs it separately from
+# PyTorch's CPU-only index (https://download.pytorch.org/whl/cpu) so this
+# CPU-only deployment doesn't pull multi-GB CUDA libraries it can't use.
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+transformers==4.46.0
+sentencepiece==0.2.0
