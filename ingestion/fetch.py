@@ -46,12 +46,22 @@ def fetch_all(
     written: list[Path] = []
 
     with httpx.Client(
-        headers={"User-Agent": USER_AGENT}, timeout=15.0, follow_redirects=True
+        headers={"User-Agent": USER_AGENT}, timeout=180.0, follow_redirects=True
     ) as client:
         for i, entry in enumerate(sources):
             doc_id = entry["doc_id"]
             ext = entry["format"]
             target = raw_dir / f"{doc_id}.{ext}"
+
+            if entry.get("fetch") is False:
+                if target.exists():
+                    print(f"[manual] {doc_id} using existing {target}")
+                    written.append(target)
+                    continue
+                raise FileNotFoundError(
+                    f"{doc_id}: fetch=false but {target} is missing. "
+                    f"Place the PDF manually, then re-run."
+                )
 
             if target.exists() and not force:
                 print(f"[skip] {doc_id} already at {target}")
@@ -92,7 +102,7 @@ if __name__ == "__main__":
 
     try:
         results = fetch_all(args.registry, args.raw_dir, args.delay, args.force)
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, FileNotFoundError, ValueError) as exc:
         print(f"[error] fetch failed: {exc}", file=sys.stderr)
         sys.exit(1)
 

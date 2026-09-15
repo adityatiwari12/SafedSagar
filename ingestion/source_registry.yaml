@@ -10,6 +10,88 @@ sources:
     effective_date: null
     last_verified_date: "2026-09-15"
 
+  - doc_id: india-patents-rules-2003
+    title: "The Patents Rules, 2003 (e-version updated till 21-09-2021)"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "https://ipindia.gov.in/frontend/pdf/patents/rules/Indian_Patent_Rules_2003__1_.pdf"
+    format: pdf
+    version: "updated-till-2021-09-21"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "Official IPO PDF of the Patents Rules 2003 consolidation. Later 2024 amendment gazettes exist separately; this is the stable consolidated HTML-export PDF still served from ipindia.gov.in/frontend/pdf/patents/rules/."
+
+  - doc_id: india-trade-marks-act-1999
+    title: "The Trade Marks Act, 1999"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://ipindia.gov.in/frontend/pdf/trade-mark/act/1_43_1_trade-marks-act.pdf"
+    format: pdf
+    version: "1999"
+    effective_date: "2003-09-15"
+    last_verified_date: "2026-09-15"
+
+  - doc_id: india-designs-act-2000
+    title: "The Designs Act, 2000"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://ipindia.gov.in/storage/uploads/docs-operator/b86a073f-f3f5-4484-b98c-1ca21cd846a3.pdf"
+    format: pdf
+    version: "2000"
+    effective_date: "2001-05-11"
+    last_verified_date: "2026-09-15"
+
+  - doc_id: india-gi-act-1999
+    title: "The Geographical Indications of Goods (Registration and Protection) Act, 1999"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://faolex.fao.org/docs/pdf/ind82321.pdf"
+    format: pdf
+    version: "1999"
+    effective_date: "2003-09-15"
+    last_verified_date: "2026-09-15"
+    notes: "IPO legacy writereaddata PDF paths 404 after site migration. FAOLEX mirrors the Gazette-notified Act text as a stable PDF."
+
+  - doc_id: india-gi-rules-2002
+    title: "The Geographical Indications of Goods (Registration and Protection) Rules, 2002"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "https://faolex.fao.org/docs/pdf/ind183134.pdf"
+    format: pdf
+    version: "2002"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "FAOLEX mirror of GI Rules 2002; used because IPO static rule PDFs are not reliably fetchable."
+
+  - doc_id: india-copyright-act-1957
+    title: "The Copyright Act, 1957"
+    authority: "Copyright Office / Ministry of Commerce and Industry (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://web.archive.org/web/20240101120000/https://copyright.gov.in/documents/copyrightrules1957.pdf"
+    format: pdf
+    version: "1957-as-published-on-copyright.gov.in"
+    effective_date: "1958-01-21"
+    last_verified_date: "2026-09-15"
+    notes: "copyright.gov.in TLS fails from this environment; Wayback capture of the same Copyright Office PDF (file is named copyrightrules1957.pdf but contains the Act text as served by the Copyright Office)."
+
+  - doc_id: india-drugs-and-cosmetics-act-1940
+    title: "The Drugs and Cosmetics Act, 1940 and Rules, 1945 (CDSCO compilation)"
+    authority: "Central Drugs Standard Control Organisation (CDSCO) / Ministry of Health and Family Welfare (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://cdsco.gov.in/opencms/export/sites/CDSCO_WEB/Pdf-documents/acts_rules/2016DrugsandCosmeticsAct1940Rules1945.pdf"
+    format: pdf
+    version: "2016-cdsco-compilation"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "CDSCO official compilation PDF covering the Act and Rules; includes AYUSH-relevant drug regulatory provisions."
+
   - doc_id: india-biological-diversity-act-2002
     title: "The Biological Diversity Act, 2002"
     authority: "National Biodiversity Authority / Ministry of Environment, Forest and Climate Change (India)"
@@ -21,6 +103,18 @@ sources:
     effective_date: "2003-02-05"
     last_verified_date: "2026-09-15"
     notes: "nbaindia.org's old direct PDF links (nbaindia.org/uploaded/act/...) now 301 to the bare nbaindia.nic.in homepage after a domain migration. India Code also migrated (indiacode.nic.in -> indiacode.gov.in) and now serves a JS SPA shell for every path, including old /bitstream/... links, so no static PDF is fetchable there anymore. FAOLEX (FAO's international legal database, faolex.fao.org) mirrors the same Gazette-notified Act text as a stable, directly-fetchable PDF and is used here instead."
+
+  - doc_id: india-biological-diversity-amendment-act-2023
+    title: "The Biological Diversity (Amendment) Act, 2023"
+    authority: "Ministry of Environment, Forest and Climate Change (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://web.archive.org/web/20240801000000/https://egazette.gov.in/WriteReadData/2023/247815.pdf"
+    format: pdf
+    version: "2023"
+    effective_date: "2024-04-01"
+    last_verified_date: "2026-09-15"
+    notes: "egazette.gov.in TLS fails from this environment; Wayback capture of the same Gazette PDF (WriteReadData/2023/247815.pdf). Biological Diversity Rules 2024 PDF was not verifiable as a direct fetchable file this wave — omit rather than ship a broken URL."
 
   - doc_id: fssai-ayurveda-aahara-regulations-2022
     title: "Food Safety and Standards (Ayurveda Aahara) Regulations, 2022"
@@ -34,6 +128,74 @@ sources:
     last_verified_date: "2026-09-15"
     notes: "fssai.gov.in's own site now serves a JS SPA shell for every path (including this exact PDF URL, verified: 200 OK but text/html, not the file) - no static file is directly fetchable from the live site anymore. Using a Wayback Machine capture of the same gazette PDF (captured 2024-05-26, before/independent of the SPA migration) as a stable substitute for the identical official content."
 
+  - doc_id: divya-pharmacy-v-uoi
+    title: "Divya Pharmacy v. Union of India (Uttarakhand High Court, 21 December 2018)"
+    authority: "High Court of Uttarakhand at Nainital"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://cdnbbsr.s3waas.gov.in/s3fcdb3b4550e745d29a64a696047067b7/uploads/2025/02/20250225762744805.pdf"
+    format: pdf
+    version: "2018-SCC-OnLine-Utt-1035"
+    effective_date: "2018-12-21"
+    last_verified_date: "2026-09-15"
+    notes: "Landmark ABS/FEBS judgment (Writ Petition (M/S) No. 3437 of 2016). Hosted on eCourts/S3WAAS CDN as a direct PDF — auto-fetched (no fetch:false needed)."
+
+  - doc_id: wto-trips-1994
+    title: "Agreement on Trade-Related Aspects of Intellectual Property Rights (TRIPS)"
+    authority: "World Trade Organization"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wto.org/english/docs_e/legal_e/27-trips.pdf"
+    format: pdf
+    version: "1994"
+    effective_date: "1995-01-01"
+    last_verified_date: "2026-09-15"
+
+  - doc_id: wipo-paris-convention
+    title: "Paris Convention for the Protection of Industrial Property (Stockholm Act, as amended 1979)"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wipo.int/edocs/pubdocs/en/wipo_pub_201.pdf"
+    format: pdf
+    version: "1979-amended"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+
+  - doc_id: wipo-pct
+    title: "Patent Cooperation Treaty (PCT) (as modified on October 3, 2001)"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wipo.int/documents/d/pct-system/docs-en-texts-pct.pdf"
+    format: pdf
+    version: "2001-modified"
+    effective_date: "2002-04-01"
+    last_verified_date: "2026-09-15"
+
+  - doc_id: wipo-budapest-treaty
+    title: "Budapest Treaty on the International Recognition of the Deposit of Microorganisms for the Purposes of Patent Procedure (WIPO publication)"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wipo.int/edocs/pubdocs/en/wipo_pub_277.pdf"
+    format: pdf
+    version: "wipo-pub-277"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "Official WIPO publication PDF (pub 277) covering the Budapest Treaty text and related materials."
+
+  - doc_id: cbd-1992
+    title: "Convention on Biological Diversity"
+    authority: "Secretariat of the Convention on Biological Diversity (CBD)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.cbd.int/doc/legal/cbd-en.pdf"
+    format: pdf
+    version: "1992"
+    effective_date: "1993-12-29"
+    last_verified_date: "2026-09-15"
+
   - doc_id: wipo-nagoya-protocol-2010
     title: "Nagoya Protocol on Access to Genetic Resources and the Fair and Equitable Sharing of Benefits Arising from their Utilization to the Convention on Biological Diversity"
     authority: "Secretariat of the Convention on Biological Diversity (CBD)"
@@ -45,3 +207,15 @@ sources:
     effective_date: "2014-10-12"
     last_verified_date: "2026-09-15"
     notes: "wipolex.wipo.int/wipo.int serves a JS SPA shell for its treaty text pages (verified: 200 OK but text/html, not a PDF). Using the CBD Secretariat's own official PDF of the same treaty text instead - CBD is the treaty's parent convention body and the authoritative source either way."
+
+  - doc_id: wipo-gratk-2024
+    title: "WIPO Treaty on Intellectual Property, Genetic Resources and Associated Traditional Knowledge (GRATK/DC/7)"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wipo.int/edocs/mdocs/tk/en/gratk_dc/gratk_dc_7.pdf"
+    format: pdf
+    version: "2024-05-24"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "WIPO Treaty on Intellectual Property, Genetic Resources and Associated Traditional Knowledge (adopted 24 May 2024). Signed but NOT YET IN FORCE — needs further ratifications. Present as signed/not binding, never as active law."
