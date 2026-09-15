@@ -24,7 +24,9 @@ class Citation(TypedDict):
 
 
 class GraphState(TypedDict, total=False):
-    question: str
+    question: str  # the latest turn's raw text, unmodified
+    history_text: str | None  # prior turns as "User:...\nAssistant:...\n" lines, or None
+    retrieval_query: str  # condense_query's standalone rewrite - what classify/route/retrieve use
     jurisdiction: str | None  # "india" | "international" | None (both)
     doc_type: str | None
 

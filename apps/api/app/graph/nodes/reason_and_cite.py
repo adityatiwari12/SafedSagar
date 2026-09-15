@@ -22,6 +22,7 @@ JURISDICTION FOR THIS ANSWER: {jurisdiction}
 Use ONLY the numbered source chunks below. Do not cite or invent \
 authority from any other jurisdiction. If the chunks are insufficient, \
 abstain plainly instead of guessing.
+{history_section}
 
 If any chunk is from the WIPO GRATK treaty (doc_id containing \
 "gratk"), you MUST state it is signed but NOT YET IN FORCE / not \
@@ -100,6 +101,18 @@ def _format_chunks(chunks: list[dict]) -> str:
     return "\n\n".join(lines)
 
 
+def _format_history_section(history_text: str | None) -> str:
+    if not history_text:
+        return ""
+    return (
+        f"\nCONVERSATION SO FAR:\n{history_text}\n\n"
+        f"The user's latest message (QUESTION below) may refer back to "
+        f"something already described above (e.g. \"it\"/\"this\") - "
+        f"resolve it using that context. Do not ask the user to repeat "
+        f"information they already gave.\n"
+    )
+
+
 def reason_and_cite(state: GraphState) -> dict:
     chunks = state.get("reranked_chunks", [])
     question = state["question"]
@@ -118,6 +131,7 @@ def reason_and_cite(state: GraphState) -> dict:
         chunks_block=_format_chunks(chunks),
         question=question,
         jurisdiction=jurisdiction,
+        history_section=_format_history_section(state.get("history_text")),
     )
 
     provider = settings.llm_reasoning_provider

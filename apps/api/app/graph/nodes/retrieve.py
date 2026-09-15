@@ -181,7 +181,7 @@ async def _bm25_search(
 
 
 async def retrieve(state: GraphState) -> dict:
-    question = state["question"]
+    question = state["retrieval_query"]
     jurisdiction = state.get("jurisdiction")
     doc_type = state.get("doc_type")
 

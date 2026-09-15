@@ -1,11 +1,17 @@
 """The full IP-SAKTI Sahayak state graph, hand-rolled as a plain sequence
 of async node functions sharing one state dict. See pyproject.toml for
 why this isn't built on the `langgraph` package. Node sequence matches
-CLAUDE.md's architecture section:
+CLAUDE.md's architecture section, plus a condense_query step ahead of it
+(the query-planner gap CLAUDE.md's "Known gaps" section flags as FR-10):
 
-    classify_product -> route_jurisdiction -> route_ip_type ->
-    retrieve -> rerank -> reason_and_cite -> validate_citations ->
-    score_confidence -> escalate_if_needed
+    condense_query -> classify_product -> route_jurisdiction ->
+    route_ip_type -> retrieve -> rerank -> reason_and_cite ->
+    validate_citations -> score_confidence -> escalate_if_needed
+
+Split into CLASSIFY_NODES / REMAINING_NODES so a caller (chat/router.py's
+clarifying-question precheck) can run just enough to decide whether to
+ask a clarifying question, without paying for retrieval + the slow
+reason_and_cite LLM call on a turn whose answer will be thrown away.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ import inspect
 from typing import Awaitable, Callable
 
 from app.graph.nodes.classify_product import classify_product
+from app.graph.nodes.condense_query import condense_query
 from app.graph.nodes.escalate_if_needed import escalate_if_needed
 from app.graph.nodes.reason_and_cite import reason_and_cite
 from app.graph.nodes.rerank import rerank
@@ -26,8 +33,12 @@ from app.graph.state import GraphState
 
 Node = Callable[[GraphState], dict] | Callable[[GraphState], Awaitable[dict]]
 
-NODES: list[Node] = [
+CLASSIFY_NODES: list[Node] = [
+    condense_query,
     classify_product,
+]
+
+REMAINING_NODES: list[Node] = [
     route_jurisdiction,
     route_ip_type,
     retrieve,
@@ -38,15 +49,60 @@ NODES: list[Node] = [
     escalate_if_needed,
 ]
 
+NODES: list[Node] = CLASSIFY_NODES + REMAINING_NODES
 
-async def run_graph(question: str, jurisdiction: str | None = None, doc_type: str | None = None) -> GraphState:
-    """Run the full node sequence and return the final state."""
-    state: GraphState = {"question": question, "jurisdiction": jurisdiction, "doc_type": doc_type}
 
-    for node in NODES:
+async def _run_nodes(nodes: list[Node], state: GraphState) -> GraphState:
+    for node in nodes:
         result = node(state)
         if inspect.isawaitable(result):
             result = await result
         state.update(result)
-
     return state
+
+
+def _initial_state(
+    question: str,
+    jurisdiction: str | None,
+    doc_type: str | None,
+    history_text: str | None,
+) -> GraphState:
+    return {
+        "question": question,
+        "jurisdiction": jurisdiction,
+        "doc_type": doc_type,
+        "history_text": history_text,
+    }
+
+
+async def run_classification(
+    question: str,
+    jurisdiction: str | None = None,
+    doc_type: str | None = None,
+    *,
+    history_text: str | None = None,
+) -> GraphState:
+    """Run only condense_query + classify_product - enough to decide
+    whether to ask a clarifying question, without running retrieval or
+    the LLM reasoning call. Pass the result to run_remaining to continue
+    the same turn without recomputing these nodes."""
+    state = _initial_state(question, jurisdiction, doc_type, history_text)
+    return await _run_nodes(CLASSIFY_NODES, state)
+
+
+async def run_remaining(state: GraphState) -> GraphState:
+    """Continue a state already produced by run_classification through
+    the rest of the graph."""
+    return await _run_nodes(REMAINING_NODES, state)
+
+
+async def run_graph(
+    question: str,
+    jurisdiction: str | None = None,
+    doc_type: str | None = None,
+    *,
+    history_text: str | None = None,
+) -> GraphState:
+    """Run the full node sequence and return the final state."""
+    state = await run_classification(question, jurisdiction, doc_type, history_text=history_text)
+    return await run_remaining(state)

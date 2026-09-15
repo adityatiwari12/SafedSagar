@@ -32,7 +32,7 @@ def route_jurisdiction(state: GraphState) -> dict:
     if state.get("jurisdiction") in _VALID_JURISDICTIONS:
         return {"jurisdiction_source": "explicit"}
 
-    prompt = _PROMPT_TEMPLATE.format(question=state["question"])
+    prompt = _PROMPT_TEMPLATE.format(question=state["retrieval_query"])
     try:
         result = generate_json(prompt)
         jurisdiction = result.get("jurisdiction", "india")

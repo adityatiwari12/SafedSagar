@@ -31,7 +31,7 @@ Return ONLY the JSON object.
 
 
 def classify_product(state: GraphState) -> dict:
-    question = state["question"]
+    question = state["retrieval_query"]
     prompt = _PROMPT_TEMPLATE.format(question=question)
 
     try:

@@ -30,7 +30,7 @@ from app.db.models import (
     MessageRole,
     User,
 )
-from app.graph.graph import run_graph
+from app.graph.graph import run_classification, run_graph, run_remaining
 from app.graph.state import GraphState
 
 router = APIRouter(tags=["chat"])
@@ -74,19 +74,27 @@ async def _get_or_create_conversation(
 _HISTORY_TURN_LIMIT = 3
 
 
-async def _build_contextualized_question(
-    db: AsyncSession, conversation: Conversation, latest_text: str
-) -> str:
-    """Fold prior turns into the question sent to the graph.
+async def _build_history_text(
+    db: AsyncSession, conversation: Conversation
+) -> str | None:
+    """Prior turns as plain "Speaker: text" lines, or None for a fresh
+    conversation.
 
-    Without this, every /chat call was a fully independent run_graph()
-    invocation seeing only the latest message - a follow-up like "Can I
-    patent it?" had no idea what "it" was, since nothing about the
-    previous turn's product ever reached classify_product/retrieve/
-    reason_and_cite. Verified live (2026-09-15): asking about a specific
+    Without conversation history reaching the graph at all, every /chat
+    call was a fully independent run_graph() invocation seeing only the
+    latest message - a follow-up like "Can I patent it?" had no idea what
+    "it" was. Verified live (2026-09-15): asking about a specific
     Ashwagandha+Brahmi formulation in turn 1, then "Can I patent it?" in
     turn 2, produced a generic non-answer about industrial application
-    with no connection to the actual product. This is the fix.
+    with no connection to the actual product.
+
+    Kept as a plain transcript (no instructions baked in) rather than the
+    single wrapped-question string this used to build: classify_product/
+    route_jurisdiction/route_ip_type/retrieve now get condense_query's
+    standalone rewrite instead of this raw transcript, and reason_and_cite
+    builds its own history section from this field directly - each node
+    gets what it actually needs instead of everything getting the same
+    instruction-laden blob.
     """
     result = await db.execute(
         select(Message)
@@ -96,22 +104,13 @@ async def _build_contextualized_question(
     )
     prior_messages = list(reversed(result.scalars().all()))
     if not prior_messages:
-        return latest_text
+        return None
 
     lines = []
     for m in prior_messages:
         speaker = "User" if m.role == MessageRole.user else "Assistant"
         lines.append(f"{speaker}: {m.content}")
-    history_block = "\n".join(lines)
-
-    return (
-        f"Conversation so far:\n{history_block}\n\n"
-        f"User's latest message: {latest_text}\n\n"
-        f"Answer the latest message. Use the conversation so far to resolve "
-        f"anything ambiguous in it (e.g. 'it'/'this' referring to a product "
-        f"already described) - do not ask the user to repeat information "
-        f"they already gave."
-    )
+    return "\n".join(lines)
 
 
 def _enrich_citations(state: GraphState) -> list[CitationOut]:
@@ -171,7 +170,7 @@ async def chat(
     # Must run BEFORE adding this turn's Message below - autoflush would
     # otherwise flush that pending insert first and the "prior messages"
     # query would see (and duplicate) the current turn.
-    contextualized_text = await _build_contextualized_question(db, conversation, payload.text)
+    history_text = await _build_history_text(db, conversation)
 
     db.add(Message(conversation_id=conversation.id, role=MessageRole.user, content=payload.text))
 
@@ -182,23 +181,28 @@ async def chat(
     is_clarification_answer = bool(payload.answers)
 
     if not is_clarification_answer:
-        precheck_state = await run_graph(contextualized_text, jurisdiction, None)
-        if precheck_state.get("product_classification") == "unclear":
+        # Classify first, cheaply - condense_query + classify_product only,
+        # no retrieval or reasoning yet. Previously this ran the FULL graph
+        # (including the slow reason_and_cite LLM call) just to check
+        # product_classification, discarding a real answer whenever it came
+        # back "unclear".
+        classify_state = await run_classification(payload.text, jurisdiction, None, history_text=history_text)
+        if classify_state.get("product_classification") == "unclear":
             await db.commit()
             return ChatTurnResponse(
                 conversationId=str(conversation.id),
                 clarifying_questions=CLARIFYING_QUESTIONS,
                 classification=ClassificationOut(product_type="unknown", ip_type="unknown"),
-                jurisdiction=precheck_state.get("jurisdiction") or payload.jurisdiction,
+                jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
                 answer="",
                 citations=[],
-                confidence=precheck_state.get("confidence_score", 0.0),
+                confidence=classify_state.get("confidence_score", 0.0),
                 confidence_band="low",
                 escalate_recommended=False,
             )
-        state = precheck_state
+        state = await run_remaining(classify_state)
     else:
-        state = await run_graph(contextualized_text, jurisdiction, None)
+        state = await run_graph(payload.text, jurisdiction, None, history_text=history_text)
 
     db.add(Message(conversation_id=conversation.id, role=MessageRole.assistant, content=state.get("answer", "")))
 

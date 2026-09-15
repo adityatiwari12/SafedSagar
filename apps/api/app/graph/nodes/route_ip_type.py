@@ -24,7 +24,7 @@ Return ONLY the JSON object.
 
 def route_ip_type(state: GraphState) -> dict:
     ip_types_list = "\n".join(f"- {t}" for t in IP_TYPES)
-    prompt = _PROMPT_TEMPLATE.format(ip_types_list=ip_types_list, question=state["question"])
+    prompt = _PROMPT_TEMPLATE.format(ip_types_list=ip_types_list, question=state["retrieval_query"])
 
     try:
         result = generate_json(prompt)
