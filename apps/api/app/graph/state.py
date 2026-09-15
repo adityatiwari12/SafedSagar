@@ -49,6 +49,8 @@ class GraphState(TypedDict, total=False):
     escalate: bool
     escalation_reason: str | None
 
+    node_timings: dict[str, float]  # node function name -> wall time in ms
+
 
 # PRD Section "Description - Detailed Description": the six formulation
 # categories the assistant classifies a product into before giving

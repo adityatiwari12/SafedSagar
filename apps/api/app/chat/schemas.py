@@ -45,6 +45,18 @@ class ChatTurnResponse(BaseModel):
     escalate_recommended: bool
     next_steps: list[str] | None = None
     abs_tk_flags: AbsTkFlagsOut | None = None
+    # Multilingual fields (task Section 6/9) - additive, all default to
+    # values that preserve today's English-only behavior unchanged when
+    # `language` isn't set on the request.
+    detected_language: str = "en"
+    canonical_query: str | None = None
+    canonical_answer: str | None = None
+    translation_status: str = "not_needed"
+    needs_human_review: bool = False
+    # Per-node wall time in ms (node function name -> ms), e.g.
+    # {"retrieve": 210.4, "reason_and_cite": 25890.2} - debugging/tuning
+    # aid for RAG latency, not shown by default in the UI.
+    timing_ms: dict[str, float] | None = None
 
 
 class EscalateRequest(BaseModel):
@@ -53,3 +65,22 @@ class EscalateRequest(BaseModel):
 
 class EscalateResponse(BaseModel):
     escalation_id: str
+
+
+class ConversationSummaryOut(BaseModel):
+    conversationId: str
+    title: str
+    language: str | None = None
+    created_at: str
+    updated_at: str
+
+
+class ConversationMessageOut(BaseModel):
+    role: str  # "user" | "assistant"
+    display_text: str
+    language: str | None = None
+    created_at: str
+    # Populated for assistant messages only - the full response this turn
+    # produced, so the history view re-renders identically to when it was
+    # first shown (citations, classification, confidence and all).
+    response: ChatTurnResponse | None = None

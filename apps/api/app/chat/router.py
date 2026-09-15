@@ -19,6 +19,8 @@ from app.chat.schemas import (
     ChatTurnResponse,
     ClassificationOut,
     CitationOut,
+    ConversationMessageOut,
+    ConversationSummaryOut,
     EscalateRequest,
     EscalateResponse,
 )
@@ -32,6 +34,8 @@ from app.db.models import (
 )
 from app.graph.graph import run_classification, run_graph, run_remaining
 from app.graph.state import GraphState
+from app.translation.languages import DEFAULT_LANGUAGE, is_supported
+from app.translation.translation_service import get_translation_service
 
 router = APIRouter(tags=["chat"])
 
@@ -132,6 +136,25 @@ def _enrich_citations(state: GraphState) -> list[CitationOut]:
     return out
 
 
+def _localize_list(
+    translation_service, texts: list[str], target_language: str
+) -> tuple[list[str], str, bool]:
+    """Translate each string independently, returning ("failed" overall
+    status if any one did) - used for the static CLARIFYING_QUESTIONS list,
+    which has no single canonical answer to fall back to as a whole."""
+    if target_language == DEFAULT_LANGUAGE:
+        return texts, "not_needed", False
+
+    localized = []
+    any_unverified = False
+    for text in texts:
+        outcome = translation_service.resolve_outgoing(text, target_language)
+        localized.append(outcome.text)
+        if outcome.translation_status not in ("verified", "not_needed"):
+            any_unverified = True
+    return localized, ("failed" if any_unverified else "verified"), any_unverified
+
+
 def _abs_tk_flags(state: GraphState) -> AbsTkFlagsOut | None:
     ip_types = state.get("ip_types", [])
     biological_resource_likely = "access_and_benefit_sharing" in ip_types
@@ -167,12 +190,39 @@ async def chat(
     jurisdiction = payload.jurisdiction if payload.jurisdiction in _VALID_JURISDICTIONS else None
     conversation = await _get_or_create_conversation(db, current_user, payload.conversationId)
 
+    # Multilingual entry point (task Section 6/9): detect the query's
+    # language (falling back to the conversation's established language,
+    # then the request's declared `language`, on low-confidence detection),
+    # translate to the canonical English the rest of the pipeline expects,
+    # and remember it as the conversation's language for later turns/
+    # low-confidence fallback.
+    translation_service = get_translation_service()
+    ui_language = conversation.language or (payload.language if is_supported(payload.language) else None)
+    incoming = translation_service.resolve_incoming(payload.text, ui_language)
+    target_language = incoming.detected_language if is_supported(incoming.detected_language) else DEFAULT_LANGUAGE
+    if conversation.language is None:
+        conversation.language = target_language
+    canonical_text = incoming.canonical_query
+
     # Must run BEFORE adding this turn's Message below - autoflush would
     # otherwise flush that pending insert first and the "prior messages"
     # query would see (and duplicate) the current turn.
     history_text = await _build_history_text(db, conversation)
 
-    db.add(Message(conversation_id=conversation.id, role=MessageRole.user, content=payload.text))
+    # Stored content is always the canonical English text - history-folding
+    # and the graph itself stay English-only regardless of the user's
+    # language, per task Section 4 ("do NOT create separate knowledge
+    # bases per language"). `language` on the row records what the turn
+    # was actually conducted in.
+    db.add(
+        Message(
+            conversation_id=conversation.id,
+            role=MessageRole.user,
+            content=canonical_text,
+            display_text=payload.text,
+            language=target_language,
+        )
+    )
 
     # Only offer clarification on a fresh attempt - once the user has
     # answered (frontend sends `answers` on that round), never ask again,
@@ -186,12 +236,14 @@ async def chat(
         # (including the slow reason_and_cite LLM call) just to check
         # product_classification, discarding a real answer whenever it came
         # back "unclear".
-        classify_state = await run_classification(payload.text, jurisdiction, None, history_text=history_text)
+        classify_state = await run_classification(canonical_text, jurisdiction, None, history_text=history_text)
         if classify_state.get("product_classification") == "unclear":
-            await db.commit()
-            return ChatTurnResponse(
+            localized_questions, cq_status, cq_review = _localize_list(
+                translation_service, CLARIFYING_QUESTIONS, target_language
+            )
+            response = ChatTurnResponse(
                 conversationId=str(conversation.id),
-                clarifying_questions=CLARIFYING_QUESTIONS,
+                clarifying_questions=localized_questions,
                 classification=ClassificationOut(product_type="unknown", ip_type="unknown"),
                 jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
                 answer="",
@@ -199,12 +251,65 @@ async def chat(
                 confidence=classify_state.get("confidence_score", 0.0),
                 confidence_band="low",
                 escalate_recommended=False,
+                detected_language=incoming.detected_language,
+                canonical_query=canonical_text,
+                canonical_answer=None,
+                translation_status=cq_status,
+                needs_human_review=cq_review,
+                timing_ms=classify_state.get("node_timings"),
             )
+            db.add(
+                Message(
+                    conversation_id=conversation.id,
+                    role=MessageRole.assistant,
+                    content="\n".join(CLARIFYING_QUESTIONS),
+                    display_text="\n".join(localized_questions),
+                    response_json=response.model_dump(),
+                    language=target_language,
+                )
+            )
+            await db.commit()
+            return response
         state = await run_remaining(classify_state)
     else:
-        state = await run_graph(payload.text, jurisdiction, None, history_text=history_text)
+        state = await run_graph(canonical_text, jurisdiction, None, history_text=history_text)
 
-    db.add(Message(conversation_id=conversation.id, role=MessageRole.assistant, content=state.get("answer", "")))
+    canonical_answer = state.get("answer", "")
+    outgoing = translation_service.resolve_outgoing(canonical_answer, target_language)
+
+    ip_types = state.get("ip_types", [])
+    response = ChatTurnResponse(
+        conversationId=str(conversation.id),
+        classification=ClassificationOut(
+            product_type=state.get("product_classification", "unclear"),
+            ip_type=", ".join(ip_types) if ip_types else "unknown",
+        ),
+        jurisdiction=state.get("jurisdiction") or payload.jurisdiction,
+        answer=outgoing.text,
+        citations=_enrich_citations(state),
+        confidence=state.get("confidence_score", 0.0),
+        confidence_band=state.get("confidence_level", "low"),
+        escalate_recommended=state.get("escalate", False),
+        next_steps=state.get("next_steps") or None,
+        abs_tk_flags=_abs_tk_flags(state),
+        detected_language=incoming.detected_language,
+        canonical_query=canonical_text,
+        canonical_answer=canonical_answer,
+        translation_status=outgoing.translation_status,
+        needs_human_review=outgoing.needs_human_review,
+        timing_ms=state.get("node_timings"),
+    )
+
+    db.add(
+        Message(
+            conversation_id=conversation.id,
+            role=MessageRole.assistant,
+            content=canonical_answer,
+            display_text=outgoing.text,
+            response_json=response.model_dump(),
+            language=target_language,
+        )
+    )
 
     if state.get("escalate"):
         db.add(
@@ -220,23 +325,7 @@ async def chat(
         )
 
     await db.commit()
-
-    ip_types = state.get("ip_types", [])
-    return ChatTurnResponse(
-        conversationId=str(conversation.id),
-        classification=ClassificationOut(
-            product_type=state.get("product_classification", "unclear"),
-            ip_type=", ".join(ip_types) if ip_types else "unknown",
-        ),
-        jurisdiction=state.get("jurisdiction") or payload.jurisdiction,
-        answer=state.get("answer", ""),
-        citations=_enrich_citations(state),
-        confidence=state.get("confidence_score", 0.0),
-        confidence_band=state.get("confidence_level", "low"),
-        escalate_recommended=state.get("escalate", False),
-        next_steps=state.get("next_steps") or None,
-        abs_tk_flags=_abs_tk_flags(state),
-    )
+    return response
 
 
 @router.post("/escalations", response_model=EscalateResponse)
@@ -267,3 +356,88 @@ async def create_escalation(
     await db.refresh(item)
 
     return EscalateResponse(escalation_id=str(item.id))
+
+
+def _make_title(text: str | None) -> str:
+    if not text:
+        return "New conversation"
+    single_line = " ".join(text.split())
+    return single_line if len(single_line) <= 60 else single_line[:57] + "..."
+
+
+@router.get("/conversations", response_model=list[ConversationSummaryOut])
+async def list_conversations(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ConversationSummaryOut]:
+    """Chat history list - one row per conversation, titled from its first
+    user message, ordered by most recent activity."""
+    result = await db.execute(
+        select(Conversation).where(Conversation.user_id == current_user.id)
+    )
+    conversations = result.scalars().all()
+
+    summaries = []
+    for conv in conversations:
+        first_user_message = await db.scalar(
+            select(Message)
+            .where(Message.conversation_id == conv.id, Message.role == MessageRole.user)
+            .order_by(Message.created_at.asc())
+            .limit(1)
+        )
+        last_message = await db.scalar(
+            select(Message)
+            .where(Message.conversation_id == conv.id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        updated_at = last_message.created_at if last_message else conv.created_at
+        summaries.append(
+            ConversationSummaryOut(
+                conversationId=str(conv.id),
+                title=_make_title(first_user_message.display_text if first_user_message else None),
+                language=conv.language,
+                created_at=conv.created_at.isoformat(),
+                updated_at=updated_at.isoformat(),
+            )
+        )
+
+    summaries.sort(key=lambda s: s.updated_at, reverse=True)
+    return summaries
+
+
+@router.get("/conversations/{conversation_id}/messages", response_model=list[ConversationMessageOut])
+async def get_conversation_messages(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ConversationMessageOut]:
+    """Full turn-by-turn history for one conversation - re-renders
+    identically to when each assistant turn was first shown, via the
+    stored `response_json` snapshot rather than re-deriving it."""
+    try:
+        conversation_uuid = uuid.UUID(conversation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid conversationId") from exc
+
+    conversation = await db.get(Conversation, conversation_uuid)
+    if conversation is None or conversation.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    result = await db.execute(
+        select(Message)
+        .where(Message.conversation_id == conversation_uuid)
+        .order_by(Message.created_at.asc())
+    )
+    messages = result.scalars().all()
+
+    return [
+        ConversationMessageOut(
+            role=m.role.value,
+            display_text=m.display_text or m.content,
+            language=m.language,
+            created_at=m.created_at.isoformat(),
+            response=ChatTurnResponse(**m.response_json) if m.response_json else None,
+        )
+        for m in messages
+    ]

@@ -17,6 +17,7 @@ reason_and_cite LLM call on a turn whose answer will be thrown away.
 from __future__ import annotations
 
 import inspect
+import time
 from typing import Awaitable, Callable
 
 from app.graph.nodes.classify_product import classify_product
@@ -53,11 +54,20 @@ NODES: list[Node] = CLASSIFY_NODES + REMAINING_NODES
 
 
 async def _run_nodes(nodes: list[Node], state: GraphState) -> GraphState:
+    # Per-node wall time, surfaced to the API response (ChatTurnResponse.
+    # timing_ms) so latency regressions - e.g. reason_and_cite's LLM call
+    # dominating end-to-end time - are visible per-request instead of only
+    # discoverable by ad-hoc `time.perf_counter()` calls during debugging.
+    # Kept on the same state dict across run_classification + run_remaining
+    # so a single chat turn accumulates one complete timing breakdown.
+    timings: dict[str, float] = state.setdefault("node_timings", {})
     for node in nodes:
+        start = time.perf_counter()
         result = node(state)
         if inspect.isawaitable(result):
             result = await result
         state.update(result)
+        timings[node.__name__] = round((time.perf_counter() - start) * 1000, 1)
     return state
 
 

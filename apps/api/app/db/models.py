@@ -102,6 +102,10 @@ class User(Base):
         server_default=VerificationStatus.approved.value,
     )
     jurisdiction_preference: Mapped[str | None] = mapped_column(String, nullable=True)
+    # ISO 639-1 code from app.translation.languages.LANGUAGES, or NULL if
+    # never set - used as the UI-language fallback when a query's detected
+    # language has low confidence (task Section 2).
+    preferred_language: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -122,6 +126,10 @@ class Conversation(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False
     )
+    # The conversation's active UI language - set from the first turn's
+    # detected/selected language, reused as the fallback for subsequent
+    # low-confidence detections in the same conversation.
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -144,7 +152,22 @@ class Message(Base):
     role: Mapped[MessageRole] = mapped_column(
         SAEnum(MessageRole, name="message_role"), nullable=False
     )
+    # Canonical English text - what the graph/history-folding actually see
+    # (app/chat/router.py), regardless of what language the turn was in.
     content: Mapped[str] = mapped_column(String, nullable=False)
+    # What was actually shown to/typed by the user: the raw user input as
+    # typed, or the localized (translated) answer for an assistant turn.
+    # Separate from `content` so reopening a past conversation (history
+    # view) displays what the person actually saw, not the English pivot
+    # text used internally for context-folding.
+    display_text: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The full ChatTurnResponse this assistant message produced (citations,
+    # classification, confidence, ...) - NULL for user messages. Lets the
+    # history view re-render exactly what was shown, not just plain text.
+    response_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Turn language - the raw user text's detected language, or the
+    # answer's target language for an assistant message.
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
