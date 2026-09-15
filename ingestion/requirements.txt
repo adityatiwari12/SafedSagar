@@ -1,0 +1,16 @@
+# Ingestion pipeline dependencies. Installed into apps/api/.venv (shared
+# venv, not a separate one) for MVP simplicity - these scripts import
+# app.db.base/app.db.models directly and never run as part of the API
+# service itself.
+#
+# No `chromadb` package here deliberately: its dependency chain (tokenizers,
+# chroma-hnswlib - both native/Rust builds) has no prebuilt wheel for this
+# Python 3.14 environment and fails to compile without a full Rust+MSVC
+# toolchain. Chroma's server exposes a plain REST API (v2, confirmed live
+# on the docker-compose container, server version 1.0.0) - embed_and_load.py
+# talks to it directly over httpx instead, which is all this project
+# actually needs (embeddings come from Ollama, not from chromadb's own
+# embedding functions).
+httpx==0.27.0
+pyyaml==6.0.2
+pypdf==5.1.0

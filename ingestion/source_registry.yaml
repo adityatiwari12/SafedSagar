@@ -1,0 +1,47 @@
+sources:
+  - doc_id: ipindia-patents-act-1970
+    title: "The Patents Act, 1970 (incorporating all amendments till 1-08-2024)"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://ipindia.gov.in/frontend/pdf/patents/1_113_1_The_Patents_Act__1970___incorporating_all_amendments_till_1-08-2024.pdf"
+    format: pdf
+    version: "amendments-till-2024-08-01"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+
+  - doc_id: india-biological-diversity-act-2002
+    title: "The Biological Diversity Act, 2002"
+    authority: "National Biodiversity Authority / Ministry of Environment, Forest and Climate Change (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "https://faolex.fao.org/docs/pdf/ind40698.pdf"
+    format: pdf
+    version: "2002"
+    effective_date: "2003-02-05"
+    last_verified_date: "2026-09-15"
+    notes: "nbaindia.org's old direct PDF links (nbaindia.org/uploaded/act/...) now 301 to the bare nbaindia.nic.in homepage after a domain migration. India Code also migrated (indiacode.nic.in -> indiacode.gov.in) and now serves a JS SPA shell for every path, including old /bitstream/... links, so no static PDF is fetchable there anymore. FAOLEX (FAO's international legal database, faolex.fao.org) mirrors the same Gazette-notified Act text as a stable, directly-fetchable PDF and is used here instead."
+
+  - doc_id: fssai-ayurveda-aahara-regulations-2022
+    title: "Food Safety and Standards (Ayurveda Aahara) Regulations, 2022"
+    authority: "Food Safety and Standards Authority of India (FSSAI)"
+    jurisdiction: india
+    doc_type: regulation
+    source_url: "https://web.archive.org/web/20240526144555/https://www.fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf"
+    format: pdf
+    version: "2022"
+    effective_date: "2022-05-09"
+    last_verified_date: "2026-09-15"
+    notes: "fssai.gov.in's own site now serves a JS SPA shell for every path (including this exact PDF URL, verified: 200 OK but text/html, not the file) - no static file is directly fetchable from the live site anymore. Using a Wayback Machine capture of the same gazette PDF (captured 2024-05-26, before/independent of the SPA migration) as a stable substitute for the identical official content."
+
+  - doc_id: wipo-nagoya-protocol-2010
+    title: "Nagoya Protocol on Access to Genetic Resources and the Fair and Equitable Sharing of Benefits Arising from their Utilization to the Convention on Biological Diversity"
+    authority: "Secretariat of the Convention on Biological Diversity (CBD)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.cbd.int/abs/doc/protocol/nagoya-protocol-en.pdf"
+    format: pdf
+    version: "2010"
+    effective_date: "2014-10-12"
+    last_verified_date: "2026-09-15"
+    notes: "wipolex.wipo.int/wipo.int serves a JS SPA shell for its treaty text pages (verified: 200 OK but text/html, not a PDF). Using the CBD Secretariat's own official PDF of the same treaty text instead - CBD is the treaty's parent convention body and the authoritative source either way."
