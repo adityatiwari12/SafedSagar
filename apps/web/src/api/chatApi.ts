@@ -1,12 +1,13 @@
 import { mockChatApi } from './mockChatApi'
 import { realChatApi } from './realChatApi'
+import { LanguageCode } from './languages'
 
 export interface ChatTurnInput {
   conversationId: string | null
   text: string
   jurisdiction: 'india' | 'international'
   answers?: Record<string, string>
-  language?: 'en' | 'hi'
+  language?: LanguageCode
 }
 
 export interface Citation {
@@ -33,6 +34,14 @@ export interface ChatTurnResponse {
     traditional_knowledge_likely: boolean
     note?: string
   }
+  // Multilingual fields - additive, backend defaults them so English-only
+  // callers see unchanged behavior (detected_language: "en",
+  // translation_status: "not_needed").
+  detected_language?: LanguageCode
+  canonical_query?: string | null
+  canonical_answer?: string | null
+  translation_status?: 'not_needed' | 'verified' | 'failed' | 'unavailable'
+  needs_human_review?: boolean
 }
 
 export interface ChatApi {

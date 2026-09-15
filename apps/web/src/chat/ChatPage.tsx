@@ -1,12 +1,16 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AppShell } from '../layout/AppShell'
+import { isRtl } from '../api/languages'
 import { useChatSession } from './useChatSession'
 import { MessageBubble } from './MessageBubble'
 import { ClarifyingQuestionForm } from './ClarifyingQuestionForm'
 import { EscalateButton } from './EscalateButton'
 import { AnswerPanel } from './AnswerPanel'
 import { JourneyStepper, deriveJourneyStep } from './JourneyStepper'
+import { ThinkingIndicator } from './ThinkingIndicator'
+import { ChatHistorySidebar } from './ChatHistorySidebar'
+import { GuidedIntakeForm } from './GuidedIntakeForm'
 
 const EXAMPLES = [
   'I developed a new Ayurvedic formulation using Ashwagandha. Can I patent it?',
@@ -17,6 +21,7 @@ const EXAMPLES = [
 export default function ChatPage() {
   const session = useChatSession()
   const [draft, setDraft] = useState('')
+  const [showGuided, setShowGuided] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
@@ -72,19 +77,49 @@ export default function ChatPage() {
 
         <JourneyStepper active={activeStep} />
 
-        <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
+        <div className="grid gap-5 lg:grid-cols-[14rem_1fr_18rem]">
+          <ChatHistorySidebar
+            activeConversationId={session.conversationId}
+            onSelect={(id) => void session.loadConversation(id)}
+            onNewChat={session.startNewChat}
+            refreshKey={session.turns.length}
+          />
+
           <div className="space-y-4">
-            <div className="gov-panel flex min-h-[22rem] flex-col">
+            {/* dir scoped to just the chat panel - task Section 8: don't make
+                the whole app RTL when Urdu isn't active. */}
+            <div
+              className="gov-panel flex min-h-[22rem] flex-col"
+              dir={isRtl(session.language) ? 'rtl' : 'ltr'}
+            >
               <div className="border-b border-surface-border bg-surface-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
                 Conversation
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
-                {session.turns.length === 0 && (
+                {session.turns.length === 0 && showGuided && (
+                  <GuidedIntakeForm
+                    onCancel={() => setShowGuided(false)}
+                    onComplete={(text) => {
+                      setShowGuided(false)
+                      void session.sendMessage(text)
+                    }}
+                  />
+                )}
+
+                {session.turns.length === 0 && !showGuided && (
                   <div className="rounded-sm border border-dashed border-surface-border bg-surface-muted/60 p-4 text-sm text-ink-muted">
                     <p className="font-semibold text-navy">Start with a clear product description</p>
                     <p className="mt-1">
-                      Try one of these examples, or write your own question in the box below.
+                      Try one of these examples, write your own question below, or{' '}
+                      <button
+                        type="button"
+                        className="font-semibold text-primary underline"
+                        onClick={() => setShowGuided(true)}
+                      >
+                        let us walk you through it step by step
+                      </button>
+                      .
                     </p>
                     <ul className="mt-3 space-y-2">
                       {EXAMPLES.map((ex) => (
@@ -112,11 +147,7 @@ export default function ChatPage() {
                   </MessageBubble>
                 ))}
 
-                {session.status === 'sending' && (
-                  <p className="text-sm text-ink-muted" role="status">
-                    Analysing against the citation-grounded corpus…
-                  </p>
-                )}
+                {session.status === 'sending' && <ThinkingIndicator />}
               </div>
 
               {session.pendingClarifying && (

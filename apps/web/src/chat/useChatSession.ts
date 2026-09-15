@@ -1,6 +1,27 @@
 import { useCallback, useRef, useState } from 'react'
 import { chatApi, ChatTurnResponse } from '../api/chatApi'
+import { conversationsApi } from '../api/conversationsApi'
 import { ApiError } from '../api/http'
+import { LanguageCode, isSupportedLanguage } from '../api/languages'
+
+const LANGUAGE_STORAGE_KEY = 'ipsakti.language'
+
+function loadStoredLanguage(): LanguageCode {
+  try {
+    const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+    return (stored as LanguageCode) || 'en'
+  } catch {
+    return 'en' // localStorage can throw (private browsing, blocked storage) - fall back silently
+  }
+}
+
+function storeLanguage(lang: LanguageCode) {
+  try {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
+  } catch {
+    // per-viewer convenience only - losing this is not worth surfacing an error for
+  }
+}
 
 export interface Turn {
   id: string
@@ -18,12 +39,21 @@ function nextTurnId() {
 export function useChatSession() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [jurisdiction, setJurisdictionState] = useState<'india' | 'international'>('india')
-  const [language, setLanguage] = useState<'en' | 'hi'>('en')
+  const [language, setLanguageState] = useState<LanguageCode>(loadStoredLanguage)
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [pendingClarifying, setPendingClarifying] = useState<string[] | null>(null)
+  // Mirrors conversationIdRef.current, purely so the history sidebar can
+  // reactively highlight the active conversation - runTurn/loadConversation
+  // read the ref directly (no re-render dependency needed there).
+  const [conversationId, setConversationIdState] = useState<string | null>(null)
   const conversationIdRef = useRef<string | null>(null)
   const lastUserTextRef = useRef<string | null>(null)
+
+  const setConversationId = useCallback((id: string | null) => {
+    conversationIdRef.current = id
+    setConversationIdState(id)
+  }, [])
 
   const runTurn = useCallback(
     async (text: string, answers?: Record<string, string>, juris?: 'india' | 'international') => {
@@ -37,7 +67,7 @@ export function useChatSession() {
           answers,
           language,
         })
-        conversationIdRef.current = response.conversationId
+        setConversationId(response.conversationId)
 
         if (response.clarifying_questions?.length) {
           setPendingClarifying(response.clarifying_questions)
@@ -113,13 +143,60 @@ export function useChatSession() {
     [runTurn],
   )
 
+  const setLanguage = useCallback((lang: LanguageCode) => {
+    storeLanguage(lang)
+    setLanguageState(lang)
+  }, [])
+
   const escalate = useCallback(async () => {
     if (!conversationIdRef.current) return null
     return chatApi.escalate(conversationIdRef.current)
   }, [])
 
+  const startNewChat = useCallback(() => {
+    setConversationId(null)
+    setTurns([])
+    setPendingClarifying(null)
+    setError(null)
+    setStatus('idle')
+    lastUserTextRef.current = null
+  }, [setConversationId])
+
+  const loadConversation = useCallback(
+    async (id: string) => {
+      setStatus('sending')
+      setError(null)
+      try {
+        const messages = await conversationsApi.getMessages(id)
+        const loadedTurns: Turn[] = messages.map((m) => ({
+          id: nextTurnId(),
+          role: m.role,
+          text: m.role === 'user' ? m.display_text : undefined,
+          response: m.role === 'assistant' ? m.response ?? undefined : undefined,
+        }))
+        const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
+        const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+
+        setConversationId(id)
+        setTurns(loadedTurns)
+        setPendingClarifying(lastAssistant?.response?.clarifying_questions?.length ? lastAssistant.response.clarifying_questions : null)
+        lastUserTextRef.current = lastUser?.display_text ?? null
+        if (isSupportedLanguage(lastUser?.language ?? lastAssistant?.language)) {
+          setLanguage((lastUser?.language ?? lastAssistant?.language) as LanguageCode)
+        }
+        setStatus('idle')
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : 'Could not load that conversation.'
+        setError(message)
+        setStatus('error')
+      }
+    },
+    [setConversationId, setLanguage],
+  )
+
   return {
     turns,
+    conversationId,
     jurisdiction,
     language,
     status,
@@ -130,6 +207,8 @@ export function useChatSession() {
     sendMessage,
     answerClarifying,
     escalate,
+    startNewChat,
+    loadConversation,
     retryLast: async () => {
       if (!lastUserTextRef.current) return
       await runTurn(lastUserTextRef.current)

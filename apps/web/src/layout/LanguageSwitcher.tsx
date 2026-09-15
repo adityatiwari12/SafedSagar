@@ -1,34 +1,29 @@
-type Language = 'en' | 'hi'
+import { LANGUAGES, LanguageCode } from '../api/languages'
 
 export function LanguageSwitcher({
   value,
   onChange,
 }: {
-  value: Language
-  onChange: (lang: Language) => void
+  value: LanguageCode
+  onChange: (lang: LanguageCode) => void
 }) {
   return (
-    <div className="flex items-center gap-2 text-sm" role="group" aria-label="Language">
-      <span className="text-ink-faint">Language</span>
-      <button
-        type="button"
-        className={`rounded-sm px-2 py-1 font-medium ${
-          value === 'en' ? 'bg-saffron text-white' : 'bg-white text-ink hover:bg-surface-muted'
-        }`}
-        aria-pressed={value === 'en'}
-        onClick={() => onChange('en')}
+    <div className="flex items-center gap-2 text-sm">
+      <label htmlFor="language-select" className="text-ink-faint">
+        Language
+      </label>
+      <select
+        id="language-select"
+        className="gov-input !w-auto rounded-sm border border-surface-border bg-white px-2 py-1 text-sm font-medium text-ink"
+        value={value}
+        onChange={(e) => onChange(e.target.value as LanguageCode)}
       >
-        English
-      </button>
-      <button
-        type="button"
-        className="cursor-not-allowed rounded-sm border border-dashed border-surface-border px-2 py-1 text-ink-faint"
-        title="Hindi coming in a later phase (Bhashini)"
-        aria-disabled="true"
-        disabled
-      >
-        हिंदी
-      </button>
+        {LANGUAGES.map((lang) => (
+          <option key={lang.code} value={lang.code} lang={lang.code}>
+            {lang.nativeName}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }

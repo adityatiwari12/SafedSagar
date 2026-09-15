@@ -1,26 +1,71 @@
+import { useState } from 'react'
 import { ChatTurnResponse } from '../api/chatApi'
 import { CitationList } from './CitationList'
-import { ClassificationBadges } from './ClassificationBadges'
-import { ConfidenceBadge } from './ConfidenceBadge'
+
+const BAND_DOT = {
+  high: 'bg-ayush-bright',
+  medium: 'bg-saffron',
+  low: 'bg-red-600',
+} as const
 
 export function AnswerPanel({ response }: { response: ChatTurnResponse }) {
+  const [showEnglish, setShowEnglish] = useState(false)
+
   if (!response.answer && response.clarifying_questions?.length) return null
 
+  const hasClassification =
+    response.classification.product_type !== 'unknown' || response.classification.ip_type !== 'unknown'
+  const pct = Math.round(response.confidence * 100)
+
+  const isTranslated = Boolean(
+    response.detected_language && response.detected_language !== 'en' && response.canonical_answer,
+  )
+
   return (
-    <div className="space-y-4">
-      {(response.classification.product_type !== 'unknown' ||
-        response.classification.ip_type !== 'unknown') && (
-        <ClassificationBadges
-          productType={response.classification.product_type}
-          ipType={response.classification.ip_type}
-          jurisdiction={response.jurisdiction}
-        />
+    <div className="space-y-3">
+      {/* The answer reads first, as chat text - not buried under badges. */}
+      {response.answer && (
+        <div
+          className="whitespace-pre-wrap text-[0.95rem] leading-relaxed text-ink"
+          lang={showEnglish ? 'en' : response.detected_language || 'en'}
+        >
+          {showEnglish && response.canonical_answer ? response.canonical_answer : response.answer}
+        </div>
       )}
 
-      <ConfidenceBadge band={response.confidence_band} confidence={response.confidence} />
+      {/* One compact meta line instead of stacked badges - classification,
+          confidence, and translation status are useful context, not the
+          headline of every reply. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
+        {hasClassification && (
+          <span className="capitalize">
+            {response.classification.product_type.replace(/_/g, ' ')} ·{' '}
+            {response.jurisdiction === 'india' ? 'India' : 'International'}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1">
+          <span className={`h-1.5 w-1.5 rounded-full ${BAND_DOT[response.confidence_band]}`} aria-hidden="true" />
+          Confidence: {response.confidence_band} ({pct}%)
+        </span>
+        {isTranslated && (
+          <button
+            type="button"
+            className="underline decoration-dotted hover:text-ink-muted"
+            onClick={() => setShowEnglish((v) => !v)}
+          >
+            {showEnglish ? 'View translated' : 'View in English'}
+          </button>
+        )}
+        {response.needs_human_review && (
+          <span className="text-amber-800">Translation unverified - showing safest available text</span>
+        )}
+      </div>
 
-      {response.answer && (
-        <div className="prose-sm whitespace-pre-wrap text-ink">{response.answer}</div>
+      {response.confidence_band === 'low' && (
+        <p className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900" role="status">
+          Low confidence — this answer may be incomplete. Prefer rephrasing your question or
+          escalating to a human IP facilitator rather than relying on this alone.
+        </p>
       )}
 
       {response.abs_tk_flags &&
@@ -48,19 +93,26 @@ export function AnswerPanel({ response }: { response: ChatTurnResponse }) {
           </aside>
         )}
 
-      <CitationList citations={response.citations} />
+      {response.citations.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer font-semibold text-primary hover:text-primary-dark">
+            Sources ({response.citations.length})
+          </summary>
+          <CitationList citations={response.citations} />
+        </details>
+      )}
 
       {response.next_steps && response.next_steps.length > 0 && (
-        <section className="gov-panel border-l-4 border-indiaGreen p-4" aria-labelledby="next-steps">
-          <h3 id="next-steps" className="text-base font-bold text-navy">
-            Action plan — what to do next
-          </h3>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-ink">
+        <details className="text-sm">
+          <summary className="cursor-pointer font-semibold text-primary hover:text-primary-dark">
+            Suggested next steps
+          </summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink">
             {response.next_steps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
-        </section>
+        </details>
       )}
     </div>
   )

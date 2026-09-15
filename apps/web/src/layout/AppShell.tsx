@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { LanguageCode } from '../api/languages'
 import { GovTopBar } from './GovTopBar'
 import { StateEmblem } from './StateEmblem'
 import { LanguageSwitcher } from './LanguageSwitcher'
@@ -28,8 +29,8 @@ export function AppShell({
   children: ReactNode
   jurisdiction?: 'india' | 'international'
   onJurisdictionChange?: (j: 'india' | 'international') => void
-  language?: 'en' | 'hi'
-  onLanguageChange?: (l: 'en' | 'hi') => void
+  language?: LanguageCode
+  onLanguageChange?: (l: LanguageCode) => void
   showJourneyControls?: boolean
 }) {
   const { user, status, logout } = useAuth()

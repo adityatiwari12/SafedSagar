@@ -32,6 +32,42 @@
     outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }
+  /* Script-appropriate font per lang attribute, not per component - any
+     element marked lang="hi"/"bn"/etc (see AnswerPanel.tsx) picks up the
+     matching Noto Sans variant automatically instead of falling through
+     to whatever the OS ships for that script. */
+  [lang='hi'],
+  [lang='mr'] {
+    font-family: 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
+  }
+  [lang='bn'],
+  [lang='as'] {
+    font-family: 'Noto Sans Bengali', 'Noto Sans', sans-serif;
+  }
+  [lang='ta'] {
+    font-family: 'Noto Sans Tamil', 'Noto Sans', sans-serif;
+  }
+  [lang='te'] {
+    font-family: 'Noto Sans Telugu', 'Noto Sans', sans-serif;
+  }
+  [lang='gu'] {
+    font-family: 'Noto Sans Gujarati', 'Noto Sans', sans-serif;
+  }
+  [lang='kn'] {
+    font-family: 'Noto Sans Kannada', 'Noto Sans', sans-serif;
+  }
+  [lang='ml'] {
+    font-family: 'Noto Sans Malayalam', 'Noto Sans', sans-serif;
+  }
+  [lang='pa'] {
+    font-family: 'Noto Sans Gurmukhi', 'Noto Sans', sans-serif;
+  }
+  [lang='or'] {
+    font-family: 'Noto Sans Oriya', 'Noto Sans', sans-serif;
+  }
+  [lang='ur'] {
+    font-family: 'Noto Sans Arabic', 'Noto Sans', sans-serif;
+  }
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
