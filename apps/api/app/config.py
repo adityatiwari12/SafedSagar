@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_embed_model: str = "nomic-embed-text"
     ollama_generate_model: str = "llama3.2"
+    # Optional override used only by reason_and_cite (the final-answer call,
+    # where quality matters more than latency) - e.g. "gpt-oss:20b" for a
+    # thinking-model quality bump. classify_product/routers stay on the fast
+    # default: a thinking model adds tens of seconds per call on CPU-only
+    # hardware, unacceptable for the quick categorical calls.
+    ollama_reasoning_model: str | None = None
 
     # Generation provider: "ollama" (default) or "cloud" (OpenAI-compatible).
     llm_provider: str = "ollama"

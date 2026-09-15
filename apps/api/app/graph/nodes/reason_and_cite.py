@@ -121,9 +121,17 @@ def reason_and_cite(state: GraphState) -> dict:
     )
 
     provider = settings.llm_reasoning_provider
+    reasoning_model = settings.ollama_reasoning_model
+    # A local thinking model (e.g. gpt-oss:20b) can take tens of seconds per
+    # call on CPU-only hardware even for a short prompt - verified live
+    # (2026-09-15): ~44s for a trivial JSON reply with thinking enabled, and
+    # thinking cannot be disabled without breaking JSON validity. The full
+    # reason_and_cite prompt (chunks + conversation history) is much longer,
+    # so give it real headroom instead of racing the default 120s budget.
+    timeout = 240.0 if reasoning_model else 120.0
 
     def _generate() -> dict:
-        return generate_json(prompt, provider=provider) if provider else generate_json(prompt)
+        return generate_json(prompt, timeout, provider=provider, model=reasoning_model)
 
     # Small local models occasionally emit malformed JSON, especially on
     # longer prompts (e.g. once conversation history is folded into the
