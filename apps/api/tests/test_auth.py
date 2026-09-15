@@ -54,7 +54,7 @@ async def test_register_default_role_is_user_approved(client):
     assert body["verification_status"] == "approved"
 
 
-async def test_register_facilitator_request_lands_pending(client):
+async def test_register_facilitator_activates_immediately(client):
     email = f"{uuid.uuid4()}@example.test"
     resp = await client.post(
         "/auth/register",
@@ -63,17 +63,17 @@ async def test_register_facilitator_request_lands_pending(client):
     assert resp.status_code == 201
     body = resp.json()
     assert body["role"] == "facilitator"
-    assert body["verification_status"] == "pending"
+    assert body["verification_status"] == "approved"
 
 
-async def test_register_regulatory_expert_request_lands_pending(client):
+async def test_register_regulatory_expert_activates_immediately(client):
     email = f"{uuid.uuid4()}@example.test"
     resp = await client.post(
         "/auth/register",
         json={"email": email, "password": "testpass123", "role": "regulatory_expert"},
     )
     assert resp.status_code == 201
-    assert resp.json()["verification_status"] == "pending"
+    assert resp.json()["verification_status"] == "approved"
 
 
 async def test_register_admin_role_rejected_422(client):

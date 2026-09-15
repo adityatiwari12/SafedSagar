@@ -12,13 +12,13 @@ const ROLE_OPTIONS: { value: SelfRegisterableRole; label: string; hint: string }
   },
   {
     value: 'facilitator',
-    label: 'IP Facilitator (request access)',
-    hint: 'Reviews escalated IP cases. Requires admin verification before your dashboard activates.',
+    label: 'IP Facilitator',
+    hint: 'Reviews escalated IP cases. Case-review dashboard is still in progress.',
   },
   {
     value: 'regulatory_expert',
-    label: 'Regulatory Expert (request access)',
-    hint: 'Reviews escalated regulatory-compliance cases. Requires admin verification before activation.',
+    label: 'Regulatory Expert',
+    hint: 'Reviews escalated regulatory-compliance cases. Case-review dashboard is still in progress.',
   },
 ]
 
@@ -46,7 +46,10 @@ export default function RegisterPage() {
   }
 
   const allConsentsGiven = consentPrivacy && consentTerms && consentNotAdvice
-  const requestsVerification = role !== 'user'
+  // Facilitator/Regulatory Expert accounts activate immediately (no
+  // admin-approval gate) - they land on /placeholder only because that
+  // dashboard isn't built yet, not because of any pending status.
+  const isNonUserRole = role !== 'user'
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -61,7 +64,7 @@ export default function RegisterPage() {
         role,
         ...(role === 'user' ? { persona } : {}),
       })
-      navigate(requestsVerification ? '/placeholder' : '/ask')
+      navigate(isNonUserRole ? '/placeholder' : '/ask')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Registration failed')
     } finally {
@@ -159,11 +162,10 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {requestsVerification && (
+          {isNonUserRole && (
             <p className="rounded-sm bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              This role requires admin verification. Your account will be created, but the
-              facilitator/expert workspace stays locked until an administrator approves your
-              request.
+              The dedicated case-review workspace for this role is still being built — your
+              account will be created and active, but you won't see a case queue yet.
             </p>
           )}
 

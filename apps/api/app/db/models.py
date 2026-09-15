@@ -47,9 +47,12 @@ class VerificationStatus(str, enum.Enum):
 # set - provisioned out-of-band only (see the ORM docstring above).
 SELF_REGISTERABLE_ROLES = {UserRole.user, UserRole.facilitator, UserRole.regulatory_expert}
 
-# Roles that land pending until an admin approves, rather than being
-# immediately active.
-ROLES_REQUIRING_VERIFICATION = {UserRole.facilitator, UserRole.regulatory_expert}
+# NOTE: an admin-approval gate for facilitator/regulatory_expert
+# (VerificationStatus.pending at registration) was designed and briefly
+# implemented, then removed on explicit request for the demo/hackathon
+# build - all self-registered roles now activate immediately. The
+# `VerificationStatus` enum and `User.verification_status` column stay in
+# the schema for when that gate is reinstated.
 
 
 class MessageRole(str, enum.Enum):

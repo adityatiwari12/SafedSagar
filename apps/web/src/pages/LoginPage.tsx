@@ -3,6 +3,17 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth, ApiError } from '../auth/AuthContext'
 import { AppShell } from '../layout/AppShell'
 
+// Fixed demo accounts, seeded via apps/api/scripts/seed_demo_users.py.
+// Same password for all - this is a demo convenience, not how real
+// accounts work (real registration is on /register).
+const DEMO_PASSWORD = 'DemoPass123!'
+const DEMO_ACCOUNTS = [
+  { label: 'User', email: 'demo-user@ipsakti.demo' },
+  { label: 'IP Facilitator', email: 'demo-facilitator@ipsakti.demo' },
+  { label: 'Regulatory Expert', email: 'demo-regulatory-expert@ipsakti.demo' },
+  { label: 'Admin', email: 'demo-admin@ipsakti.demo' },
+]
+
 export default function LoginPage() {
   const { login, status, user } = useAuth()
   const navigate = useNavigate()
@@ -15,18 +26,33 @@ export default function LoginPage() {
     return <Navigate to={user.role === 'user' ? '/ask' : '/placeholder'} replace />
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function doLogin(loginEmail: string, loginPassword: string) {
     setBusy(true)
     setError(null)
     try {
-      await login(email.trim(), password)
+      await login(loginEmail.trim(), loginPassword)
       navigate('/ask')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed')
     } finally {
       setBusy(false)
     }
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    await doLogin(email, password)
+  }
+
+  function fillDemoAccount(demoEmail: string) {
+    setEmail(demoEmail)
+    setPassword(DEMO_PASSWORD)
+  }
+
+  async function quickLogin(demoEmail: string) {
+    setEmail(demoEmail)
+    setPassword(DEMO_PASSWORD)
+    await doLogin(demoEmail, DEMO_PASSWORD)
   }
 
   return (
@@ -38,7 +64,31 @@ export default function LoginPage() {
           minute.
         </p>
 
-        <form onSubmit={onSubmit} className="gov-panel mt-6 space-y-4 p-5">
+        <div className="gov-panel mt-6 border-dashed p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Demo quick login
+          </p>
+          <p className="mt-1 text-xs text-ink-faint">
+            One click signs in as a seeded demo account for each role. Not for production use.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {DEMO_ACCOUNTS.map((acct) => (
+              <button
+                key={acct.email}
+                type="button"
+                onClick={() => quickLogin(acct.email)}
+                onDoubleClick={() => fillDemoAccount(acct.email)}
+                disabled={busy}
+                title={`${acct.email} — click to sign in, double-click to just fill the form`}
+                className="gov-btn-secondary text-xs"
+              >
+                {acct.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form onSubmit={onSubmit} className="gov-panel mt-4 space-y-4 p-5">
           <div>
             <label className="gov-label" htmlFor="email">
               Email
