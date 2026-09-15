@@ -130,10 +130,12 @@ async def test_conversation_message_escalation_and_audit_log_round_trip():
 
 @pytest.mark.asyncio
 async def test_source_document_round_trip():
-    doc_id = f"ipindia-patents-act-2024-s3p-{uuid.uuid4().hex[:8]}"
+    doc_id = f"ipindia-patents-act-1970-{uuid.uuid4().hex[:8]}"
+    chunk_id = f"{doc_id}#s3p"
     async with AsyncSessionLocal() as session:
         doc = SourceDocument(
-            id=doc_id,
+            id=chunk_id,
+            doc_id=doc_id,
             title="The Patents Act, 1970 - Section 3(p)",
             authority="Office of the Controller General of Patents, Designs & Trade Marks",
             jurisdiction=Jurisdiction.india,
@@ -149,8 +151,9 @@ async def test_source_document_round_trip():
         await session.commit()
 
     async with AsyncSessionLocal() as session:
-        fetched = await session.get(SourceDocument, doc_id)
+        fetched = await session.get(SourceDocument, chunk_id)
         assert fetched is not None
+        assert fetched.doc_id == doc_id
         assert fetched.title == "The Patents Act, 1970 - Section 3(p)"
         assert fetched.jurisdiction == Jurisdiction.india
         assert fetched.doc_type == "statute"

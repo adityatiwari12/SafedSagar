@@ -156,11 +156,20 @@ class AuditLogEntry(Base):
 
 
 class SourceDocument(Base):
-    """A legal source document indexed for retrieval."""
+    """A single retrievable chunk of a legal source document.
+
+    One logical document (an Act, a treaty) has many chunk rows sharing
+    the same `doc_id` - `id` is the chunk's own unique key. Document-level
+    fields (title/authority/jurisdiction/...) are denormalized onto every
+    chunk row so a retrieved chunk carries its full citation without a
+    join; `validate_citations` (Phase 3) matches a citation's `doc_id` +
+    `section_or_article` against this table.
+    """
 
     __tablename__ = "source_documents"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    doc_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     authority: Mapped[str] = mapped_column(String, nullable=False)
     jurisdiction: Mapped[Jurisdiction] = mapped_column(
