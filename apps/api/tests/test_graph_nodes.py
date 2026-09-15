@@ -1,6 +1,8 @@
 """Deterministic unit tests for the pure (non-network) graph nodes."""
 
+from app.graph.nodes.escalate_if_needed import escalate_if_needed
 from app.graph.nodes.rerank import rerank
+from app.graph.nodes.score_confidence import score_confidence
 from app.graph.nodes.validate_citations import validate_citations
 
 
@@ -63,3 +65,46 @@ def test_validate_citations_rejects_fabricated_citation():
 def test_validate_citations_empty_inputs():
     result = validate_citations({"reranked_chunks": [], "raw_citations": []})
     assert result == {"validated_citations": [], "rejected_citations": []}
+
+
+def test_score_confidence_zero_when_nothing_retrieved():
+    result = score_confidence({"reranked_chunks": [], "validated_citations": [], "rejected_citations": []})
+    assert result == {"confidence_score": 0.0, "confidence_level": "low"}
+
+
+def test_score_confidence_high_when_all_citations_validated():
+    chunks = [_chunk("a"), _chunk("b"), _chunk("c")]
+    validated = [{"doc_id": "doc-1", "section_or_article": "1"}] * 3
+    result = score_confidence({"reranked_chunks": chunks, "validated_citations": validated, "rejected_citations": []})
+    assert result["confidence_level"] == "high"
+    assert result["confidence_score"] == 1.0
+
+
+def test_score_confidence_low_when_all_citations_rejected():
+    chunks = [_chunk("a")]
+    rejected = [{"doc_id": "doc-1", "section_or_article": "1"}] * 3
+    result = score_confidence({"reranked_chunks": chunks, "validated_citations": [], "rejected_citations": rejected})
+    assert result["confidence_level"] == "low"
+
+
+def test_escalate_when_confidence_low():
+    result = escalate_if_needed({"confidence_level": "low", "validated_citations": [], "product_classification": "cosmetic"})
+    assert result["escalate"] is True
+    assert result["escalation_reason"]
+
+
+def test_escalate_when_no_validated_citations():
+    result = escalate_if_needed({"confidence_level": "medium", "validated_citations": [], "product_classification": "cosmetic"})
+    assert result["escalate"] is True
+
+
+def test_escalate_when_product_unclear():
+    citations = [{"doc_id": "doc-1", "section_or_article": "1"}]
+    result = escalate_if_needed({"confidence_level": "high", "validated_citations": citations, "product_classification": "unclear"})
+    assert result["escalate"] is True
+
+
+def test_no_escalation_when_confident_cited_and_classified():
+    citations = [{"doc_id": "doc-1", "section_or_article": "1"}]
+    result = escalate_if_needed({"confidence_level": "high", "validated_citations": citations, "product_classification": "cosmetic"})
+    assert result == {"escalate": False, "escalation_reason": None}

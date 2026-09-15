@@ -21,4 +21,12 @@ async def query(payload: QueryRequest, _current_user: User = Depends(get_current
             for c in state.get("validated_citations", [])
         ],
         rejected_citation_count=len(state.get("rejected_citations", [])),
+        product_classification=state.get("product_classification", "unclear"),
+        jurisdiction=state.get("jurisdiction"),
+        jurisdiction_source=state.get("jurisdiction_source", "explicit"),
+        ip_types=state.get("ip_types", []),
+        confidence_score=state.get("confidence_score", 0.0),
+        confidence_level=state.get("confidence_level", "low"),
+        escalate=state.get("escalate", True),
+        escalation_reason=state.get("escalation_reason"),
     )
