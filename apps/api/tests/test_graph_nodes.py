@@ -118,7 +118,7 @@ def _numbered_chunks() -> list[dict]:
 
 def test_extract_bracket_citations_maps_index_to_chunk():
     answer = "You must comply with Section 3 [1] and file under Section 18 [2]."
-    result = _extract_bracket_citations(answer, _numbered_chunks())
+    result = _extract_bracket_citations([answer], _numbered_chunks())
     assert result == [
         {"doc_id": "patents-act", "section_or_article": "3"},
         {"doc_id": "tm-act", "section_or_article": "18"},
@@ -127,16 +127,26 @@ def test_extract_bracket_citations_maps_index_to_chunk():
 
 def test_extract_bracket_citations_dedupes_repeated_marker():
     answer = "See [1]. Also see [1] again."
-    result = _extract_bracket_citations(answer, _numbered_chunks())
+    result = _extract_bracket_citations([answer], _numbered_chunks())
     assert result == [{"doc_id": "patents-act", "section_or_article": "3"}]
 
 
 def test_extract_bracket_citations_ignores_out_of_range_index():
     answer = "This cites a nonexistent chunk [99]."
-    result = _extract_bracket_citations(answer, _numbered_chunks())
+    result = _extract_bracket_citations([answer], _numbered_chunks())
     assert result == []
 
 
 def test_extract_bracket_citations_no_markers():
-    result = _extract_bracket_citations("No citations here.", _numbered_chunks())
+    result = _extract_bracket_citations(["No citations here."], _numbered_chunks())
     assert result == []
+
+
+def test_extract_bracket_citations_scans_next_steps_too():
+    answer = "See the recommendations below."
+    next_steps = ["File Form I with the NBA [1]", "Review Section 18 requirements [2]"]
+    result = _extract_bracket_citations([answer, *next_steps], _numbered_chunks())
+    assert result == [
+        {"doc_id": "patents-act", "section_or_article": "3"},
+        {"doc_id": "tm-act", "section_or_article": "18"},
+    ]

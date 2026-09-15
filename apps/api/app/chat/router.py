@@ -9,6 +9,7 @@ the graph actually retrieved.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, get_db
@@ -67,6 +68,52 @@ async def _get_or_create_conversation(
     return conversation
 
 
+# How many prior turns to fold into the graph's question text. Bounded so
+# a long conversation doesn't blow up the prompt - a follow-up almost
+# always only needs the last exchange or two to resolve "it"/"this".
+_HISTORY_TURN_LIMIT = 3
+
+
+async def _build_contextualized_question(
+    db: AsyncSession, conversation: Conversation, latest_text: str
+) -> str:
+    """Fold prior turns into the question sent to the graph.
+
+    Without this, every /chat call was a fully independent run_graph()
+    invocation seeing only the latest message - a follow-up like "Can I
+    patent it?" had no idea what "it" was, since nothing about the
+    previous turn's product ever reached classify_product/retrieve/
+    reason_and_cite. Verified live (2026-09-15): asking about a specific
+    Ashwagandha+Brahmi formulation in turn 1, then "Can I patent it?" in
+    turn 2, produced a generic non-answer about industrial application
+    with no connection to the actual product. This is the fix.
+    """
+    result = await db.execute(
+        select(Message)
+        .where(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.desc())
+        .limit(_HISTORY_TURN_LIMIT * 2)
+    )
+    prior_messages = list(reversed(result.scalars().all()))
+    if not prior_messages:
+        return latest_text
+
+    lines = []
+    for m in prior_messages:
+        speaker = "User" if m.role == MessageRole.user else "Assistant"
+        lines.append(f"{speaker}: {m.content}")
+    history_block = "\n".join(lines)
+
+    return (
+        f"Conversation so far:\n{history_block}\n\n"
+        f"User's latest message: {latest_text}\n\n"
+        f"Answer the latest message. Use the conversation so far to resolve "
+        f"anything ambiguous in it (e.g. 'it'/'this' referring to a product "
+        f"already described) - do not ask the user to repeat information "
+        f"they already gave."
+    )
+
+
 def _enrich_citations(state: GraphState) -> list[CitationOut]:
     chunks_by_key = {
         (c["doc_id"], c["section_or_article"]): c for c in state.get("reranked_chunks", [])
@@ -121,6 +168,11 @@ async def chat(
     jurisdiction = payload.jurisdiction if payload.jurisdiction in _VALID_JURISDICTIONS else None
     conversation = await _get_or_create_conversation(db, current_user, payload.conversationId)
 
+    # Must run BEFORE adding this turn's Message below - autoflush would
+    # otherwise flush that pending insert first and the "prior messages"
+    # query would see (and duplicate) the current turn.
+    contextualized_text = await _build_contextualized_question(db, conversation, payload.text)
+
     db.add(Message(conversation_id=conversation.id, role=MessageRole.user, content=payload.text))
 
     # Only offer clarification on a fresh attempt - once the user has
@@ -130,7 +182,7 @@ async def chat(
     is_clarification_answer = bool(payload.answers)
 
     if not is_clarification_answer:
-        precheck_state = await run_graph(payload.text, jurisdiction, None)
+        precheck_state = await run_graph(contextualized_text, jurisdiction, None)
         if precheck_state.get("product_classification") == "unclear":
             await db.commit()
             return ChatTurnResponse(
@@ -146,7 +198,7 @@ async def chat(
             )
         state = precheck_state
     else:
-        state = await run_graph(payload.text, jurisdiction, None)
+        state = await run_graph(contextualized_text, jurisdiction, None)
 
     db.add(Message(conversation_id=conversation.id, role=MessageRole.assistant, content=state.get("answer", "")))
 

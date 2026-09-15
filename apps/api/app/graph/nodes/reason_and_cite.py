@@ -59,27 +59,33 @@ Return ONLY the JSON object, nothing else.
 _BRACKET_CITATION_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 
 
-def _extract_bracket_citations(answer: str, chunks: list[dict]) -> list[Citation]:
-    """Map every [N] (or [N, M, ...]) marker in the answer back to the
-    Nth numbered chunk (1-indexed, matching _format_chunks). Citations
-    built this way are valid by construction - N either indexes into
-    `chunks` or it doesn't, there's no doc_id/section transcription for
-    the model to get subtly wrong. This replaced asking the model for a
-    separate citations JSON field, which the local model frequently
+def _extract_bracket_citations(texts: list[str], chunks: list[dict]) -> list[Citation]:
+    """Map every [N] (or [N, M, ...]) marker across all given texts back
+    to the Nth numbered chunk (1-indexed, matching _format_chunks).
+    Citations built this way are valid by construction - N either indexes
+    into `chunks` or it doesn't, there's no doc_id/section transcription
+    for the model to get subtly wrong. This replaced asking the model for
+    a separate citations JSON field, which the local model frequently
     filled with a doc_id/section that didn't exactly match its own
     numbered list, causing validate_citations to reject everything even
     when the answer's inline references were perfectly sound.
+
+    Scans `answer` AND `next_steps` (not just `answer`): the model often
+    puts its citation for a recommendation inside the next_steps item
+    itself (e.g. "File Form I [4]") rather than repeating it in the
+    prose answer - those are just as real and checkable.
     """
     seen: set[int] = set()
     citations: list[Citation] = []
-    for match in _BRACKET_CITATION_RE.finditer(answer):
-        for index_str in match.group(1).split(","):
-            index = int(index_str.strip())
-            if index in seen or not (1 <= index <= len(chunks)):
-                continue
-            seen.add(index)
-            chunk = chunks[index - 1]
-            citations.append(Citation(doc_id=chunk["doc_id"], section_or_article=chunk["section_or_article"]))
+    for text in texts:
+        for match in _BRACKET_CITATION_RE.finditer(text):
+            for index_str in match.group(1).split(","):
+                index = int(index_str.strip())
+                if index in seen or not (1 <= index <= len(chunks)):
+                    continue
+                seen.add(index)
+                chunk = chunks[index - 1]
+                citations.append(Citation(doc_id=chunk["doc_id"], section_or_article=chunk["section_or_article"]))
     return citations
 
 
@@ -115,12 +121,27 @@ def reason_and_cite(state: GraphState) -> dict:
     )
 
     provider = settings.llm_reasoning_provider
-    try:
-        if provider:
-            result = generate_json(prompt, provider=provider)
-        else:
-            result = generate_json(prompt)
-    except (json.JSONDecodeError, KeyError, RuntimeError, ValueError):
+
+    def _generate() -> dict:
+        return generate_json(prompt, provider=provider) if provider else generate_json(prompt)
+
+    # Small local models occasionally emit malformed JSON, especially on
+    # longer prompts (e.g. once conversation history is folded into the
+    # question - verified live 2026-09-15: ~1 in 3 calls failed on a
+    # contextualized follow-up, and the identical retry succeeded with a
+    # real, on-topic answer). One retry before falling back to the
+    # "could not produce a well-formed answer" abstention - cheap, and it
+    # turns a chunk of genuine model hiccups into a real answer instead
+    # of a dead end that looks like the system didn't understand.
+    result = None
+    for _attempt in range(2):
+        try:
+            result = _generate()
+            break
+        except (json.JSONDecodeError, KeyError, RuntimeError, ValueError):
+            continue
+
+    if result is None:
         return {
             "answer": "The assistant could not produce a well-formed answer "
             "for this question. Please try rephrasing, or escalate to a "
@@ -130,7 +151,7 @@ def reason_and_cite(state: GraphState) -> dict:
         }
 
     answer = result.get("answer", "")
-    raw_citations = _extract_bracket_citations(answer, chunks)
     next_steps = [s for s in result.get("next_steps", []) if isinstance(s, str) and s.strip()]
+    raw_citations = _extract_bracket_citations([answer, *next_steps], chunks)
 
     return {"answer": answer, "raw_citations": raw_citations, "next_steps": next_steps}

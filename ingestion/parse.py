@@ -1,7 +1,8 @@
-"""Extract plain text from a raw downloaded document (PDF or HTML)."""
+"""Extract plain text from a raw downloaded document (PDF, HTML, or MHT)."""
 
 from __future__ import annotations
 
+import email
 import re
 import sys
 from pathlib import Path
@@ -43,11 +44,36 @@ def parse_html(raw_path: Path) -> str:
     return text.strip()
 
 
+def parse_mht(raw_path: Path) -> str:
+    """MHT/MHTML - a browser-saved page (multipart/related MIME wrapping
+    the HTML plus its embedded resources). Extract the text/html part and
+    reuse the same tag-stripping as parse_html."""
+    with raw_path.open("rb") as f:
+        msg = email.message_from_bytes(f.read())
+
+    for part in msg.walk():
+        if part.get_content_type() == "text/html":
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            html = payload.decode(charset, errors="replace")
+            html = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", "", html, flags=re.DOTALL | re.IGNORECASE)
+            text = _HTML_TAG_RE.sub(" ", html)
+            text = _WHITESPACE_RE.sub(" ", text)
+            text = _BLANK_LINES_RE.sub("\n\n", text)
+            return text.strip()
+
+    raise ValueError(f"{raw_path}: no text/html part found in MHT file")
+
+
 def parse_document(raw_path: Path, doc_format: str) -> str:
     if doc_format == "pdf":
         return parse_pdf(raw_path)
     if doc_format == "html":
         return parse_html(raw_path)
+    if doc_format == "mht":
+        return parse_mht(raw_path)
     raise ValueError(f"unsupported format: {doc_format!r}")
 
 

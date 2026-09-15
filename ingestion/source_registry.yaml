@@ -295,3 +295,259 @@ sources:
     last_verified_date: "2026-09-15"
     fetch: false
     notes: "Secondary/academic analysis discussing TK patent case law, not a primary source — reason_and_cite/UI should never present this doc_type as if it were a statute, rule, treaty, or court judgment."
+
+  # --- Wave B: user-provided Drive folder (docs/data/{Ayush regulatory
+  # corpus, Copyright, Geographical indications, Trademarks, TKDL}) ---
+
+  - doc_id: india-drug-cosmetics-rules-1945
+    title: "The Drugs and Cosmetics Rules, 1945"
+    authority: "Central Drugs Standard Control Organisation (CDSCO) / Ministry of Health and Family Welfare (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "1945"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Standalone Rules text (513pp, includes schedules) - previously only had the Act+Rules combined CDSCO compilation, whose chunker mislabeled some footnote/rule-number text as section numbers (e.g. 'Section 1945', 'Section 158' - actually the Rules' year and Rule 158-B). Ingesting this separately gives cleaner section boundaries for Rules-specific citations."
+
+  - doc_id: ayush-manufacturing-license-guide
+    title: "How to Obtain an AYUSH Manufacturing License in India (third-party guide)"
+    authority: "Third-party guide (secondary source, not an official government publication)"
+    jurisdiction: india
+    doc_type: secondary_analysis
+    source_url: "provided by project team (docs/data) - saved web page, original publisher not independently verified"
+    format: mht
+    version: "2026"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Procedural walkthrough, not primary law - never present as an official requirement without cross-checking against the Act/Rules themselves."
+
+  - doc_id: pib-ayush-drug-quality-control-2022
+    title: "AYUSH Quality Control of Ayush Drugs (PIB Press Release, 2 August 2022)"
+    authority: "Press Information Bureau, Government of India"
+    jurisdiction: india
+    doc_type: notification
+    source_url: "https://www.pib.gov.in/PressReleasePage.aspx?PRID=1847448"
+    format: mht
+    version: "2022-08-02"
+    effective_date: "2022-08-02"
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Official GoI press release on AYUSH drug quality-control/licensing enforcement (State Drug Controllers, Rule 158-B). Source URL is the live PIB page (saved as MHT locally, not fetched - PIB pages are JS-rendered)."
+
+  - doc_id: india-copyright-amendment-act-2012
+    title: "The Copyright (Amendment) Act, 2012"
+    authority: "Copyright Office / Department for Promotion of Industry and Internal Trade (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "provided by project team (docs/data) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2012"
+    effective_date: "2013-06-21"
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: india-copyright-rules-1957
+    title: "The Copyright Rules, 1957"
+    authority: "Copyright Office / Department for Promotion of Industry and Internal Trade (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "1957"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: india-copyright-rules-2013
+    title: "The Copyright Rules, 2013"
+    authority: "Copyright Office / Department for Promotion of Industry and Internal Trade (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2013"
+    effective_date: "2013-03-14"
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Supersedes/amends the 1957 Rules in many respects - both kept in the corpus since the 1957 Rules base text is still referenced; a query spanning both should note the 2013 Rules as the more current procedural reference."
+
+  - doc_id: india-copyright-handbook
+    title: "Handbook of Copyright Law"
+    authority: "Copyright Office, India (official explanatory handbook - not itself binding law)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "provided by project team (docs/data) - saved web page"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Official explanatory guide, not primary legislation - present as guidance/commentary, defer to the Act/Rules for binding text."
+
+  - doc_id: india-copyright-practice-manual
+    title: "Copyright Office - Procedure and Practice Manual"
+    authority: "Copyright Office, India"
+    jurisdiction: india
+    doc_type: manual
+    source_url: "provided by project team (docs/data) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: india-gi-2020-amendment
+    title: "Geographical Indications of Goods (Registration and Protection) (Amendment) Rules, 2020"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2020"
+    effective_date: "2020-12-30"
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: india-gi-2025-amendment
+    title: "Geographical Indications of Goods (Registration and Protection) (Amendment) Rules, 2025"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2025"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "Most recent GI rules amendment in the corpus - prefer this over the 2020 amendment or the base 2002 Rules when they conflict on a procedural point."
+    fetch: false
+
+  - doc_id: india-gi-manual
+    title: "Manual of Geographical Indications"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: manual
+    source_url: "provided by project team (docs/data) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: india-gi-registered-applications
+    title: "Registration Details of Geographical Indications (registered GI applications in India, by year)"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: registry_data
+    source_url: "provided by project team (docs/data) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Tabular registry listing (GI name, application no., goods class, state) - useful for 'has X been registered as a GI' lookups, not prose legal text. Chunking may split table rows awkwardly; acceptable for MVP."
+
+  - doc_id: india-trademark-manual
+    title: "Manual of Trade Marks Practice and Procedure"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: manual
+    source_url: "provided by project team (docs/data) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  # TKDL awareness/pointer material ONLY (CLAUDE.md caveat #1: TKDL
+  # itself is not scrapable/retrievable - these are public "about the
+  # programme" pages, never actual TKDL database entries).
+
+  - doc_id: tkdl-about-database
+    title: "TKDL - About the Database"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/tkdl/langdefault/common/Abouttkdl.asp"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Public awareness page about the TKDL programme itself, not TKDL database contents (which are NDA-restricted, never retrieved - see CLAUDE.md caveat #1)."
+
+  - doc_id: tkdl-about
+    title: "TKDL - About TKDL"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: tkdl-faq
+    title: "TKDL - Frequently Asked Questions"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: tkdl-general-information
+    title: "TKDL - General Information"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: tkdl-major-milestones
+    title: "TKDL - Major Milestones"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: tkdl-source-of-information
+    title: "TKDL - Source of Information"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: tkdl-bio-piracy-outcomes
+    title: "TKDL - Outcomes Against Bio-piracy"
+    authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://www.tkdl.res.in/"
+    format: mht
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Documents real prior-art/bio-piracy-prevention case outcomes attributed to TKDL's existence - directly supports FR-09's 'TKDL prior-art likely exists, contact CSIR-TKDL' pointer framing."
