@@ -169,6 +169,16 @@ class EscalationItem(Base):
     assigned_facilitator_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    # Denormalized snapshot of the graph's output at escalation time, so a
+    # facilitator/regulatory expert can review the case without re-running
+    # the query - matches what the AI actually saw, not a live re-query
+    # that could retrieve differently later.
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    product_classification: Mapped[str | None] = mapped_column(String, nullable=True)
+    jurisdiction: Mapped[str | None] = mapped_column(String, nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(nullable=True)
+    confidence_level: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolution_summary: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

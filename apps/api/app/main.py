@@ -3,7 +3,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
+from app.cases.router import router as cases_router
 from app.query.router import router as query_router
 
 app = FastAPI(title="IP-SAKTI Sahayak API")
@@ -26,6 +28,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(query_router)
+app.include_router(cases_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")
