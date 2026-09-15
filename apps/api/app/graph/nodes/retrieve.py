@@ -77,6 +77,7 @@ def _row_to_chunk(row: SourceDocument) -> RetrievedChunk:
     return RetrievedChunk(
         id=row.id,
         doc_id=row.doc_id,
+        doc_type=row.doc_type,
         section_or_article=row.section_or_article,
         source_text=row.source_text,
         title=row.title,

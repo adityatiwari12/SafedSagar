@@ -10,6 +10,7 @@ def _chunk(id_: str, doc_id: str = "doc-1", section: str | None = "1") -> dict:
     return {
         "id": id_,
         "doc_id": doc_id,
+        "doc_type": "statute",
         "section_or_article": section,
         "source_text": "text",
         "title": "title",

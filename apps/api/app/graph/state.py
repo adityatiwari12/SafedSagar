@@ -11,6 +11,7 @@ class RetrievedChunk(TypedDict):
 
     id: str
     doc_id: str
+    doc_type: str
     section_or_article: str | None
     source_text: str
     title: str

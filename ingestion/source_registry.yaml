@@ -219,3 +219,79 @@ sources:
     effective_date: null
     last_verified_date: "2026-09-15"
     notes: "WIPO Treaty on Intellectual Property, Genetic Resources and Associated Traditional Knowledge (adopted 24 May 2024). Signed but NOT YET IN FORCE — needs further ratifications. Present as signed/not binding, never as active law."
+
+  - doc_id: india-biotech-patent-examination-guidelines-2013
+    title: "Guidelines for Examination of Biotechnology Applications for Patent (2013)"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live IPO URL this ingestion wave"
+    format: pdf
+    version: "2013"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Directly relevant to biotechnology-derived Ayurvedic formulations (fermentation, microbial processes) touching Section 3(j)/3(p) patentability."
+
+  - doc_id: india-patent-office-manual-v3-2019
+    title: "Manual of Patent Office Practice and Procedure, Version 3.0 (26 November 2019)"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: manual
+    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live IPO URL this ingestion wave"
+    format: pdf
+    version: "3.0-2019-11-26"
+    effective_date: "2019-11-26"
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "174-page procedural manual — examiner practice detail beyond the Patents Act/Rules text alone."
+
+  - doc_id: india-patents-2nd-amendment-rules-2024
+    title: "The Patents (2nd Amendment) Rules, 2024"
+    authority: "Department for Promotion of Industry and Internal Trade, Ministry of Commerce and Industry (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2024-2nd-amendment"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: india-patents-amendment-rules-2024
+    title: "The Patents (Amendment) Rules, 2024"
+    authority: "Department for Promotion of Industry and Internal Trade, Ministry of Commerce and Industry (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2024-amendment"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    notes: "Distinct gazette notification from india-patents-2nd-amendment-rules-2024 — 2024 saw more than one Patents Rules amendment; kept as separate documents rather than merged/deduplicated."
+    fetch: false
+
+  - doc_id: india-trademark-rules-2017
+    title: "The Trade Marks Rules, 2017"
+    authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2017"
+    effective_date: "2017-03-06"
+    last_verified_date: "2026-09-15"
+    fetch: false
+
+  - doc_id: tk-patent-cases-analysis-2025
+    title: "Traditional Knowledge and Patent Cases: an analysis (International Journal of Research Publication and Reviews, Vol 6, Issue 11, 2025)"
+    authority: "International Journal of Research Publication and Reviews (secondary academic source, NOT primary law or a court record)"
+    jurisdiction: india
+    doc_type: secondary_analysis
+    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live publisher URL this ingestion wave"
+    format: pdf
+    version: "2025"
+    effective_date: null
+    last_verified_date: "2026-09-15"
+    fetch: false
+    notes: "Secondary/academic analysis discussing TK patent case law, not a primary source — reason_and_cite/UI should never present this doc_type as if it were a statute, rule, treaty, or court judgment."

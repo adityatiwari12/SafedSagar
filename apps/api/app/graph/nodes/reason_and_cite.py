@@ -26,6 +26,12 @@ If any chunk is from the WIPO GRATK treaty (doc_id containing \
 "gratk"), you MUST state it is signed but NOT YET IN FORCE / not \
 binding law.
 
+A chunk's header shows its doc_type. Only doc_type=statute, rules, or \
+treaty is primary binding law. doc_type=case_law is a court record, not \
+legislation. doc_type=secondary_analysis, guideline, or manual is \
+commentary/procedural guidance, NOT primary law - present it as such, \
+never as if it were a statute or binding rule.
+
 SOURCE CHUNKS:
 {chunks_block}
 
@@ -47,8 +53,8 @@ def _format_chunks(chunks: list[dict]) -> str:
     for i, chunk in enumerate(chunks, start=1):
         section = chunk["section_or_article"] or "(no section)"
         lines.append(
-            f"[{i}] doc_id={chunk['doc_id']} section={section} "
-            f"title={chunk['title']!r}\n{chunk['source_text']}"
+            f"[{i}] doc_id={chunk['doc_id']} doc_type={chunk['doc_type']} "
+            f"section={section} title={chunk['title']!r}\n{chunk['source_text']}"
         )
     return "\n\n".join(lines)
 
