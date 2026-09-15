@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth, ApiError } from '../auth/AuthContext'
 import { AppShell } from '../layout/AppShell'
+import { roleHomePath } from '../auth/roleHome'
 
 // Fixed demo accounts, seeded via apps/api/scripts/seed_demo_users.py.
 // Same password for all - this is a demo convenience, not how real
@@ -23,15 +24,15 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
 
   if (status === 'authenticated' && user) {
-    return <Navigate to={user.role === 'user' ? '/ask' : '/placeholder'} replace />
+    return <Navigate to={roleHomePath(user.role)} replace />
   }
 
   async function doLogin(loginEmail: string, loginPassword: string) {
     setBusy(true)
     setError(null)
     try {
-      await login(loginEmail.trim(), loginPassword)
-      navigate('/ask')
+      const profile = await login(loginEmail.trim(), loginPassword)
+      navigate(roleHomePath(profile.role))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Login failed')
     } finally {

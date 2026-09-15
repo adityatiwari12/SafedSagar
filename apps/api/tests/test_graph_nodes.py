@@ -1,6 +1,7 @@
 """Deterministic unit tests for the pure (non-network) graph nodes."""
 
 from app.graph.nodes.escalate_if_needed import escalate_if_needed
+from app.graph.nodes.reason_and_cite import _extract_bracket_citations
 from app.graph.nodes.rerank import rerank
 from app.graph.nodes.score_confidence import score_confidence
 from app.graph.nodes.validate_citations import validate_citations
@@ -109,3 +110,33 @@ def test_no_escalation_when_confident_cited_and_classified():
     citations = [{"doc_id": "doc-1", "section_or_article": "1"}]
     result = escalate_if_needed({"confidence_level": "high", "validated_citations": citations, "product_classification": "cosmetic"})
     assert result == {"escalate": False, "escalation_reason": None}
+
+
+def _numbered_chunks() -> list[dict]:
+    return [_chunk("a", doc_id="patents-act", section="3"), _chunk("b", doc_id="tm-act", section="18")]
+
+
+def test_extract_bracket_citations_maps_index_to_chunk():
+    answer = "You must comply with Section 3 [1] and file under Section 18 [2]."
+    result = _extract_bracket_citations(answer, _numbered_chunks())
+    assert result == [
+        {"doc_id": "patents-act", "section_or_article": "3"},
+        {"doc_id": "tm-act", "section_or_article": "18"},
+    ]
+
+
+def test_extract_bracket_citations_dedupes_repeated_marker():
+    answer = "See [1]. Also see [1] again."
+    result = _extract_bracket_citations(answer, _numbered_chunks())
+    assert result == [{"doc_id": "patents-act", "section_or_article": "3"}]
+
+
+def test_extract_bracket_citations_ignores_out_of_range_index():
+    answer = "This cites a nonexistent chunk [99]."
+    result = _extract_bracket_citations(answer, _numbered_chunks())
+    assert result == []
+
+
+def test_extract_bracket_citations_no_markers():
+    result = _extract_bracket_citations("No citations here.", _numbered_chunks())
+    assert result == []

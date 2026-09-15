@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import { UserProfile } from '../api/authApi'
+import { roleHomePath } from './roleHome'
 
 export function RequireAuth({
   children,
@@ -20,7 +21,7 @@ export function RequireAuth({
     )
   }
   if (status !== 'authenticated' || !user) return <Navigate to="/login" replace />
-  if (allow && !allow.includes(user.role)) return <Navigate to="/placeholder" replace />
+  if (allow && !allow.includes(user.role)) return <Navigate to={roleHomePath(user.role)} replace />
 
   return <>{children}</>
 }

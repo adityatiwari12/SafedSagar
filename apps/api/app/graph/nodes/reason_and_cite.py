@@ -7,6 +7,7 @@ was actually given.
 from __future__ import annotations
 
 import json
+import re
 
 from app.config import settings
 from app.graph.state import Citation, GraphState
@@ -38,14 +39,48 @@ SOURCE CHUNKS:
 QUESTION: {question}
 
 Respond with a JSON object with exactly these fields:
-- "answer": your answer as plain text, citing chunks inline like [1], [2]
-- "citations": a list of objects, one per chunk you actually relied on, \
-each with "doc_id" and "section_or_article" copied EXACTLY from that \
-chunk's header above - never invent a doc_id or section that isn't in \
-the list above.
+- "answer": your answer as plain text. Every substantive claim MUST end \
+with the bracket number(s) of the chunk(s) it came from, e.g. "...must \
+register under Section 3 [1]." Use ONLY the bracket numbers shown before \
+each chunk above ([1], [2], ...) - never a doc_id or section string \
+inline, just the number.
+- "next_steps": a short list (2-5 items) of concrete, actionable next \
+steps for the user, grounded only in what the cited chunks actually say \
+(e.g. "File Form I with the National Biodiversity Authority before \
+commercial use" - not generic advice like "consult a lawyer" unless the \
+chunks give nothing more specific).
 
 Return ONLY the JSON object, nothing else.
 """
+
+
+# Matches [1], [1,2], [1, 5] - the model sometimes groups multiple
+# indices in one bracket rather than writing [1][5] separately.
+_BRACKET_CITATION_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+
+
+def _extract_bracket_citations(answer: str, chunks: list[dict]) -> list[Citation]:
+    """Map every [N] (or [N, M, ...]) marker in the answer back to the
+    Nth numbered chunk (1-indexed, matching _format_chunks). Citations
+    built this way are valid by construction - N either indexes into
+    `chunks` or it doesn't, there's no doc_id/section transcription for
+    the model to get subtly wrong. This replaced asking the model for a
+    separate citations JSON field, which the local model frequently
+    filled with a doc_id/section that didn't exactly match its own
+    numbered list, causing validate_citations to reject everything even
+    when the answer's inline references were perfectly sound.
+    """
+    seen: set[int] = set()
+    citations: list[Citation] = []
+    for match in _BRACKET_CITATION_RE.finditer(answer):
+        for index_str in match.group(1).split(","):
+            index = int(index_str.strip())
+            if index in seen or not (1 <= index <= len(chunks)):
+                continue
+            seen.add(index)
+            chunk = chunks[index - 1]
+            citations.append(Citation(doc_id=chunk["doc_id"], section_or_article=chunk["section_or_article"]))
+    return citations
 
 
 def _format_chunks(chunks: list[dict]) -> str:
@@ -69,6 +104,8 @@ def reason_and_cite(state: GraphState) -> dict:
             "answer": "No relevant sources were found for this question. "
             "Please rephrase or consult a human IP facilitator.",
             "raw_citations": [],
+            "next_steps": ["Rephrase the question with more product/context detail",
+                            "Escalate to a human IP facilitator"],
         }
 
     prompt = _PROMPT_TEMPLATE.format(
@@ -89,13 +126,11 @@ def reason_and_cite(state: GraphState) -> dict:
             "for this question. Please try rephrasing, or escalate to a "
             "human IP facilitator.",
             "raw_citations": [],
+            "next_steps": ["Rephrase the question", "Escalate to a human IP facilitator"],
         }
 
     answer = result.get("answer", "")
-    raw_citations: list[Citation] = [
-        Citation(doc_id=c.get("doc_id", ""), section_or_article=c.get("section_or_article"))
-        for c in result.get("citations", [])
-        if isinstance(c, dict) and c.get("doc_id")
-    ]
+    raw_citations = _extract_bracket_citations(answer, chunks)
+    next_steps = [s for s in result.get("next_steps", []) if isinstance(s, str) and s.strip()]
 
-    return {"answer": answer, "raw_citations": raw_citations}
+    return {"answer": answer, "raw_citations": raw_citations, "next_steps": next_steps}

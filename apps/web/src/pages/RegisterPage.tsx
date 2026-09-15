@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth, ApiError } from '../auth/AuthContext'
 import { AppShell } from '../layout/AppShell'
 import { SelfRegisterableRole, UserPersona } from '../api/authApi'
+import { roleHomePath } from '../auth/roleHome'
 
 const ROLE_OPTIONS: { value: SelfRegisterableRole; label: string; hint: string }[] = [
   {
@@ -13,12 +14,12 @@ const ROLE_OPTIONS: { value: SelfRegisterableRole; label: string; hint: string }
   {
     value: 'facilitator',
     label: 'IP Facilitator',
-    hint: 'Reviews escalated IP cases. Case-review dashboard is still in progress.',
+    hint: 'Reviews escalated IP cases in the case queue.',
   },
   {
     value: 'regulatory_expert',
     label: 'Regulatory Expert',
-    hint: 'Reviews escalated regulatory-compliance cases. Case-review dashboard is still in progress.',
+    hint: 'Reviews escalated regulatory-compliance cases in the case queue.',
   },
 ]
 
@@ -42,13 +43,10 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false)
 
   if (status === 'authenticated' && user) {
-    return <Navigate to={user.role === 'user' ? '/ask' : '/placeholder'} replace />
+    return <Navigate to={roleHomePath(user.role)} replace />
   }
 
   const allConsentsGiven = consentPrivacy && consentTerms && consentNotAdvice
-  // Facilitator/Regulatory Expert accounts activate immediately (no
-  // admin-approval gate) - they land on /placeholder only because that
-  // dashboard isn't built yet, not because of any pending status.
   const isNonUserRole = role !== 'user'
 
   async function onSubmit(e: FormEvent) {
@@ -60,11 +58,11 @@ export default function RegisterPage() {
     setBusy(true)
     setError(null)
     try {
-      await register(email.trim(), password, {
+      const profile = await register(email.trim(), password, {
         role,
         ...(role === 'user' ? { persona } : {}),
       })
-      navigate(isNonUserRole ? '/placeholder' : '/ask')
+      navigate(roleHomePath(profile.role))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Registration failed')
     } finally {
@@ -164,8 +162,8 @@ export default function RegisterPage() {
 
           {isNonUserRole && (
             <p className="rounded-sm bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              The dedicated case-review workspace for this role is still being built — your
-              account will be created and active, but you won't see a case queue yet.
+              You'll land in the case queue after registering — cases only appear once a User's
+              question gets escalated.
             </p>
           )}
 

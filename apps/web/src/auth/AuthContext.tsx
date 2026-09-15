@@ -9,8 +9,8 @@ type Status = 'idle' | 'loading' | 'authenticated' | 'unauthenticated'
 interface AuthContextValue {
   user: UserProfile | null
   status: Status
-  login(email: string, password: string): Promise<void>
-  register(email: string, password: string, options?: RegisterOptions): Promise<void>
+  login(email: string, password: string): Promise<UserProfile>
+  register(email: string, password: string, options?: RegisterOptions): Promise<UserProfile>
   logout(): void
 }
 
@@ -39,17 +39,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
   }, [])
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string): Promise<UserProfile> {
     const tokens = await authApi.login(email, password)
     localStorage.setItem(TOKEN_KEY, tokens.access_token)
     const profile = await authApi.me(tokens.access_token)
     setUser(profile)
     setStatus('authenticated')
+    return profile
   }
 
-  async function register(email: string, password: string, options?: RegisterOptions) {
+  async function register(
+    email: string,
+    password: string,
+    options?: RegisterOptions,
+  ): Promise<UserProfile> {
     await authApi.register(email, password, options)
-    await login(email, password)
+    return login(email, password)
   }
 
   function logout() {

@@ -40,6 +40,7 @@ class GraphState(TypedDict, total=False):
     raw_citations: list[Citation]
     validated_citations: list[Citation]
     rejected_citations: list[Citation]
+    next_steps: list[str]
 
     confidence_score: float  # 0.0-1.0
     confidence_level: str  # "high" | "medium" | "low"

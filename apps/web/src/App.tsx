@@ -4,6 +4,8 @@ import { RequireAuth } from './auth/RequireAuth'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import RolePlaceholderPage from './pages/RolePlaceholderPage'
+import CasesPage from './pages/CasesPage'
+import AdminPage from './pages/AdminPage'
 import ChatPage from './chat/ChatPage'
 import LandingPage from './landing/LandingPage'
 
@@ -27,6 +29,22 @@ export default function App() {
           element={
             <RequireAuth allow={['user']}>
               <ChatPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/cases"
+          element={
+            <RequireAuth allow={['facilitator', 'regulatory_expert', 'admin']}>
+              <CasesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth allow={['admin']}>
+              <AdminPage />
             </RequireAuth>
           }
         />

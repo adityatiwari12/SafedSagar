@@ -225,7 +225,7 @@ sources:
     authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
     jurisdiction: india
     doc_type: guideline
-    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live IPO URL this ingestion wave"
+    source_url: "provided by project team (docs/data/IPs) - not re-verified against a live IPO URL this ingestion wave"
     format: pdf
     version: "2013"
     effective_date: null
@@ -238,7 +238,7 @@ sources:
     authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
     jurisdiction: india
     doc_type: manual
-    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live IPO URL this ingestion wave"
+    source_url: "provided by project team (docs/data/IPs) - not re-verified against a live IPO URL this ingestion wave"
     format: pdf
     version: "3.0-2019-11-26"
     effective_date: "2019-11-26"
@@ -251,7 +251,7 @@ sources:
     authority: "Department for Promotion of Industry and Internal Trade, Ministry of Commerce and Industry (India)"
     jurisdiction: india
     doc_type: rules
-    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live gazette URL this ingestion wave"
+    source_url: "provided by project team (docs/data/IPs) - not re-verified against a live gazette URL this ingestion wave"
     format: pdf
     version: "2024-2nd-amendment"
     effective_date: null
@@ -263,7 +263,7 @@ sources:
     authority: "Department for Promotion of Industry and Internal Trade, Ministry of Commerce and Industry (India)"
     jurisdiction: india
     doc_type: rules
-    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live gazette URL this ingestion wave"
+    source_url: "provided by project team (docs/data/IPs) - not re-verified against a live gazette URL this ingestion wave"
     format: pdf
     version: "2024-amendment"
     effective_date: null
@@ -276,7 +276,7 @@ sources:
     authority: "Office of the Controller General of Patents, Designs & Trademarks (India)"
     jurisdiction: india
     doc_type: rules
-    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live gazette URL this ingestion wave"
+    source_url: "provided by project team (docs/data/IPs) - not re-verified against a live gazette URL this ingestion wave"
     format: pdf
     version: "2017"
     effective_date: "2017-03-06"
@@ -288,7 +288,7 @@ sources:
     authority: "International Journal of Research Publication and Reviews (secondary academic source, NOT primary law or a court record)"
     jurisdiction: india
     doc_type: secondary_analysis
-    source_url: "provided by project team (docs/data/IPs) — not re-verified against a live publisher URL this ingestion wave"
+    source_url: "provided by project team (docs/data/IPs) - not re-verified against a live publisher URL this ingestion wave"
     format: pdf
     version: "2025"
     effective_date: null

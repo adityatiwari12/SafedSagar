@@ -12,6 +12,8 @@ const CRUMBS: Record<string, string> = {
   '/login': 'Home / Login',
   '/register': 'Home / Register',
   '/placeholder': 'Home / Role workspace',
+  '/cases': 'Home / Case queue',
+  '/admin': 'Home / Admin',
 }
 
 export function AppShell({
