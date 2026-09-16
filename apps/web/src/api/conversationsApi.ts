@@ -31,4 +31,8 @@ export const conversationsApi = {
       getStoredToken(),
     )
   },
+
+  remove(conversationId: string): Promise<void> {
+    return apiFetch<void>(`/conversations/${conversationId}`, { method: 'DELETE' }, getStoredToken())
+  },
 }

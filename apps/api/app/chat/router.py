@@ -9,7 +9,7 @@ the graph actually retrieved.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, get_db
@@ -191,17 +191,27 @@ async def chat(
     conversation = await _get_or_create_conversation(db, current_user, payload.conversationId)
 
     # Multilingual entry point (task Section 6/9): detect the query's
-    # language (falling back to the conversation's established language,
-    # then the request's declared `language`, on low-confidence detection),
-    # translate to the canonical English the rest of the pipeline expects,
-    # and remember it as the conversation's language for later turns/
-    # low-confidence fallback.
+    # language for INTERPRETATION (translating the input to the canonical
+    # English the rest of the pipeline expects) - falling back to the
+    # conversation's established language, then the request's declared
+    # `language`, on low-confidence detection.
     translation_service = get_translation_service()
-    ui_language = conversation.language or (payload.language if is_supported(payload.language) else None)
+    requested_language = payload.language if is_supported(payload.language) else None
+    ui_language = conversation.language or requested_language
     incoming = translation_service.resolve_incoming(payload.text, ui_language)
-    target_language = incoming.detected_language if is_supported(incoming.detected_language) else DEFAULT_LANGUAGE
-    if conversation.language is None:
-        conversation.language = target_language
+
+    # Output language is the explicit UI selection, not auto-detection of
+    # what the user happened to type it in - picking Hindi from the
+    # dropdown must mean Hindi replies even if this particular message was
+    # typed in English. Falls back to the conversation's established
+    # language, then the detected input language, only when the request
+    # didn't declare one at all.
+    target_language = (
+        requested_language
+        or conversation.language
+        or (incoming.detected_language if is_supported(incoming.detected_language) else DEFAULT_LANGUAGE)
+    )
+    conversation.language = target_language
     canonical_text = incoming.canonical_query
 
     # Must run BEFORE adding this turn's Message below - autoflush would
@@ -358,7 +368,10 @@ async def create_escalation(
     return EscalateResponse(escalation_id=str(item.id))
 
 
-def _make_title(text: str | None) -> str:
+def _make_title(message: Message | None) -> str:
+    # display_text is the raw typed text; content is the canonical-English
+    # fallback for rows from before display_text was populated on write.
+    text = (message.display_text or message.content) if message else None
     if not text:
         return "New conversation"
     single_line = " ".join(text.split())
@@ -395,7 +408,7 @@ async def list_conversations(
         summaries.append(
             ConversationSummaryOut(
                 conversationId=str(conv.id),
-                title=_make_title(first_user_message.display_text if first_user_message else None),
+                title=_make_title(first_user_message),
                 language=conv.language,
                 created_at=conv.created_at.isoformat(),
                 updated_at=updated_at.isoformat(),
@@ -404,6 +417,30 @@ async def list_conversations(
 
     summaries.sort(key=lambda s: s.updated_at, reverse=True)
     return summaries
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Deletes a conversation and its messages/escalation items. No ORM
+    cascade or DB-level ON DELETE is configured on these FKs, so the
+    child rows are deleted explicitly, in FK-dependency order."""
+    try:
+        conversation_uuid = uuid.UUID(conversation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid conversationId") from exc
+
+    conversation = await db.get(Conversation, conversation_uuid)
+    if conversation is None or conversation.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    await db.execute(delete(EscalationItem).where(EscalationItem.conversation_id == conversation_uuid))
+    await db.execute(delete(Message).where(Message.conversation_id == conversation_uuid))
+    await db.delete(conversation)
+    await db.commit()
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[ConversationMessageOut])

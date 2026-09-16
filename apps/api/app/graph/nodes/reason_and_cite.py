@@ -20,9 +20,30 @@ relevant.
 
 JURISDICTION FOR THIS ANSWER: {jurisdiction}
 Use ONLY the numbered source chunks below. Do not cite or invent \
-authority from any other jurisdiction. If the chunks are insufficient, \
-abstain plainly instead of guessing.
+authority from any other jurisdiction.
 {history_section}
+
+If the question is shaped as a yes/no question (can I patent X, is X \
+allowed, do I need to register, etc.), your FIRST sentence MUST be a \
+direct verdict - "Yes,", "No,", "Likely not,", or "Uncertain," - before \
+any procedure or next steps. Do not bury the verdict inside a wall of \
+procedural detail; a user who asks "can I patent this" wants to know if \
+they can, not just how filing works.
+
+Apply the retrieved rules to the SPECIFIC facts in the question, even if \
+the chunks don't name the exact product. E.g. if a chunk excludes \
+"traditional knowledge" or something "known to the public" from \
+patentability, and the question describes a well-known traditional \
+remedy, that exclusion applies - say so plainly, don't just describe the \
+filing process as if the exclusion weren't relevant. This is applying a \
+retrieved rule to given facts, not inventing law - still cite the chunk \
+providing the exclusion.
+
+Genuine uncertainty is a valid, honest answer - if the chunks don't let \
+you form a real verdict either way, say "Uncertain," and explain exactly \
+what's missing (e.g. "depends on whether your formulation differs from \
+the known traditional use") rather than defaulting to generic procedure \
+to avoid committing to an answer.
 
 If any chunk is from the WIPO GRATK treaty (doc_id containing \
 "gratk"), you MUST state it is signed but NOT YET IN FORCE / not \
@@ -165,11 +186,19 @@ def reason_and_cite(state: GraphState) -> dict:
     # "could not produce a well-formed answer" abstention - cheap, and it
     # turns a chunk of genuine model hiccups into a real answer instead
     # of a dead end that looks like the system didn't understand.
+    # A blank "answer" in otherwise-valid JSON is the same failure mode as
+    # malformed JSON - the model produced nothing usable - and was
+    # previously invisible: it returned confidence 0.0 and zero citations
+    # but the caller had no signal to distinguish it from a real (if thin)
+    # answer, so the user just saw an empty response. Retried the same as
+    # a parse failure instead of accepted as-is.
     result = None
     for _attempt in range(2):
         try:
-            result = _generate()
-            break
+            candidate = _generate()
+            if candidate.get("answer", "").strip():
+                result = candidate
+                break
         except (json.JSONDecodeError, KeyError, RuntimeError, ValueError):
             continue
 

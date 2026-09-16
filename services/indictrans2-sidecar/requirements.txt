@@ -6,5 +6,13 @@
 # CPU-only deployment doesn't pull multi-GB CUDA libraries it can't use.
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
-transformers==4.46.0
+transformers==4.51.3
 sentencepiece==0.2.0
+
+# IndicTrans2 preprocessing/postprocessing (normalization, script handling,
+# sentence-piece placeholder flattening). Ships manylinux wheels for
+# cp312 - no Cython build needed in this Linux container (the "no Windows
+# wheel" problem this project hit earlier is specific to the Windows
+# host, not this container). Falls back to NLLB-200 at runtime if unused
+# (see app.py) but is always installed so the image supports both.
+IndicTransToolkit==1.1.1

@@ -1,10 +1,11 @@
 # Runs as a Linux container (Docker Desktop's Linux VM backend) because
-# IndicTransToolkit ships no Windows wheel (only manylinux/macOS/PyPy -
-# checked directly against PyPI's file listing) and building it from
-# source needs Cython, which this machine's Windows Application Control
-# policy blocks outright (same class of problem documented in
-# apps/api/pyproject.toml for the langgraph package). Same infra pattern
-# as postgres/chroma in infra/docker-compose.yml - not a new architecture.
+# torch/IndicTransToolkit ship no Windows wheel for this machine's Python
+# 3.14 (same class of problem documented in apps/api/pyproject.toml for
+# the langgraph package). Same infra pattern as postgres/chroma in
+# infra/docker-compose.yml - not a new architecture.
+#
+# IndicTransToolkit installs from a prebuilt manylinux wheel here (cp312)
+# - no Cython compiler needed in this container, unlike the Windows host.
 FROM python:3.12-slim
 
 WORKDIR /app

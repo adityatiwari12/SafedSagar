@@ -29,9 +29,16 @@ services:
     container_name: ipsakti-indictrans2-sidecar
     ports:
       - "8600:8600"
+    environment:
+      # Set HF_TOKEN (with the HF account having clicked "accept" on both
+      # ai4bharat/indictrans2-{en-indic,indic-en}-dist-200M model pages) to
+      # use real IndicTrans2. Without it, the sidecar auto-falls back to
+      # NLLB-200. TRANSLATION_BACKEND overrides the auto-detect either way.
+      HF_TOKEN: ${HF_TOKEN:-}
+      TRANSLATION_BACKEND: ${TRANSLATION_BACKEND:-}
     volumes:
-      # Persists the downloaded NLLB-200 model across container restarts -
-      # without this, every `docker compose up` re-downloads it (~2.4GB).
+      # Persists downloaded model weights across container restarts -
+      # without this, every `docker compose up` re-downloads them.
       - indictrans2_models:/root/.cache/huggingface
 
 volumes:

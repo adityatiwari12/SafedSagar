@@ -1,3 +1,4 @@
+
 # IP-SAKTI Sahayak
 
 Citation-grounded assistant for **Ayurveda intellectual property, biodiversity / ABS, and
@@ -56,7 +57,7 @@ retrieval, and citation validation are English-only throughout. See
 | Retrieval | Hybrid: vector similarity (ChromaDB) + BM25 (`rank-bm25`, over Postgres-stored chunk text), fused with Reciprocal Rank Fusion |
 | Embeddings | `nomic-embed-text` via Ollama |
 | Reasoning LLM | `llama3.2` via Ollama (default); optional OpenAI-compatible cloud provider slot (`app/llm/cloud_client.py`) for a quality upgrade without local-hardware latency |
-| Translation | `facebook/nllb-200-distilled-600M`, served by a separate Docker container (`services/indictrans2-sidecar`) — see [why](#multilingual-support) |
+| Translation | AI4Bharat IndicTrans2 (with an NLLB-200 fallback), served by a separate Docker container (`services/indictrans2-sidecar`) — see [why](#multilingual-support) |
 | Language detection | `py3langid` (pure Python, in-process, no sidecar needed) |
 | Ingestion | `ingestion/` — `source_registry.yaml` + fetch/parse/chunk/embed/load pipeline |
 
@@ -96,6 +97,10 @@ Starts `postgres:16` (`:5432`), `chromadb/chroma` (`:8000`), and the translation
 (`:8600`, builds on first run — see `services/indictrans2-sidecar/README.md` for what it
 needs and why it's a separate container). Bring up just the two required services with
 `docker compose up -d postgres chromadb` if you want to skip the sidecar for now.
+
+The sidecar runs real IndicTrans2 if you set `HF_TOKEN` in `infra/.env` (after accepting
+the gate on the two `ai4bharat/indictrans2-*-dist-200M` model pages on Hugging Face);
+without it, it auto-falls-back to NLLB-200. See the sidecar README for the one-time setup.
 
 ### 2. Ollama
 

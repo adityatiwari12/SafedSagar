@@ -27,7 +27,10 @@ export function deriveJourneyStep(opts: {
   latest?: ChatTurnResponse | null
 }): JourneyStepId {
   const { hasUserMessage, pendingClarifying, latest } = opts
-  if (!hasUserMessage) return 'jurisdiction'
+  // Sit on step 1 until a message is actually sent - jumping straight to
+  // "jurisdiction" before any interaction made both toggle steps look
+  // pre-completed on page load, which reads as "skipped a step".
+  if (!hasUserMessage) return 'language'
   if (pendingClarifying) return 'understand'
   if (!latest || !latest.answer) return 'understand'
   if (latest.classification.product_type === 'unknown') return 'classify'

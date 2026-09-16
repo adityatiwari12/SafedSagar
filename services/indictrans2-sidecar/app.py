@@ -1,36 +1,44 @@
-"""Translation sidecar - NLLB-200 (facebook/nllb-200-distilled-600M).
+"""Translation sidecar - IndicTrans2 (ai4bharat), NLLB-200 fallback.
 
-Originally built around AI4Bharat's IndicTrans2, which turned out to be a
-dead end on this stack: its `IndicTransToolkit` dependency ships no
-Windows wheel and needs Cython to build from source (blocked by this
-machine's Windows Application Control policy - see README.md), and its
-three model checkpoints are gated on Hugging Face (an "auto"-approved but
-still-manual click-through per repo, needing an account this deployment
-doesn't have). Switched to NLLB-200: **ungated**, single model covers
-every direction in our 13-language matrix (no separate en-indic/indic-en/
-indic-indic checkpoints), and needs only `transformers` - no extra
-toolkit. Still runs as its own Linux container for the same original
-reason: PyTorch has no Windows wheel for this machine's Python 3.14.
+Backend selection: `TRANSLATION_BACKEND` env var ("indictrans2" | "nllb"),
+defaulting to "indictrans2" when `HF_TOKEN` is set, else "nllb". IndicTrans2's
+checkpoints are gated on Hugging Face ("auto"-approved but still needs a
+logged-in account that has clicked "accept" on each model page once,
+plus a token with read access) - if the token is missing or the account
+hasn't accepted the gate yet, `_load()` falls back to NLLB-200 rather than
+hard-failing the container. See README.md "Model: IndicTrans2, with an
+NLLB-200 fallback" for the full history of why this was originally
+believed to be a dead end on this stack (it wasn't - that applied to the
+Windows host, not this Linux container).
 
-Kept behind the same TranslationProvider HTTP contract
-(app/translation/indictrans2_provider.py) - swapping the underlying model
-again later (e.g. to IndicTrans2 if the gate friction goes away, or to
-Bhashini) touches this file and that one, not the callers.
+IndicTrans2 ships two direction-specific checkpoints (no single
+multi-directional model like NLLB): `indictrans2-en-indic-dist-200M` for
+English -> any Indic language, and `indictrans2-indic-en-dist-200M` for
+Indic -> English. An Indic -> Indic request is served by pivoting through
+English with both models rather than loading the third (indic-indic,
+320M) checkpoint - keeps resident RAM to two 200M models instead of three
+on this 16GB dev machine.
 """
 
 from __future__ import annotations
 
+import os
 import threading
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI(title="Translation Sidecar (NLLB-200)")
+app = FastAPI(title="Translation Sidecar")
 
-MODEL_NAME = "facebook/nllb-200-distilled-600M"
+NLLB_MODEL = "facebook/nllb-200-distilled-600M"
+INDICTRANS2_EN_INDIC = "ai4bharat/indictrans2-en-indic-dist-200M"
+INDICTRANS2_INDIC_EN = "ai4bharat/indictrans2-indic-en-dist-200M"
 
-# FLORES-200 tags NLLB-200 was trained on - the same tag set IndicTrans2
-# used, so this mapping didn't need to change when the model did.
+HF_TOKEN = os.environ.get("HF_TOKEN") or None
+BACKEND = os.environ.get("TRANSLATION_BACKEND") or ("indictrans2" if HF_TOKEN else "nllb")
+
+# FLORES-200 tags - both NLLB and IndicTrans2 (via IndicTransToolkit) use
+# this same tag set, so one mapping serves either backend.
 _FLORES_TAGS = {
     "en": "eng_Latn",
     "hi": "hin_Deva",
@@ -48,26 +56,62 @@ _FLORES_TAGS = {
 }
 
 _lock = threading.Lock()
-_state: dict = {}  # {"tokenizer": ..., "model": ...} once loaded
+_state: dict = {}  # populated once by _load(); "backend" key tells translate() which path to use
 
 
-def _load() -> tuple:
+def _load_nllb() -> dict:
+    import torch
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(NLLB_MODEL)
+    model = AutoModelForSeq2SeqLM.from_pretrained(NLLB_MODEL, torch_dtype=torch.float32)
+    model.eval()
+    return {"backend": "nllb", "tokenizer": tokenizer, "model": model}
+
+
+def _load_indictrans2() -> dict:
+    import torch
+    from IndicTransToolkit.processor import IndicProcessor
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+    auth = {"token": HF_TOKEN, "trust_remote_code": True}
+
+    en_indic_tokenizer = AutoTokenizer.from_pretrained(INDICTRANS2_EN_INDIC, **auth)
+    en_indic_model = AutoModelForSeq2SeqLM.from_pretrained(
+        INDICTRANS2_EN_INDIC, torch_dtype=torch.float32, **auth
+    )
+    en_indic_model.eval()
+
+    indic_en_tokenizer = AutoTokenizer.from_pretrained(INDICTRANS2_INDIC_EN, **auth)
+    indic_en_model = AutoModelForSeq2SeqLM.from_pretrained(
+        INDICTRANS2_INDIC_EN, torch_dtype=torch.float32, **auth
+    )
+    indic_en_model.eval()
+
+    return {
+        "backend": "indictrans2",
+        "processor": IndicProcessor(inference=True),
+        "en_indic": (en_indic_tokenizer, en_indic_model),
+        "indic_en": (indic_en_tokenizer, indic_en_model),
+    }
+
+
+def _load() -> dict:
     """Lazy singleton, loaded once on first request, never per-request
     (task Section 3: "Do not load the model per request")."""
     if _state:
-        return _state["tokenizer"], _state["model"]
+        return _state
     with _lock:
         if _state:
-            return _state["tokenizer"], _state["model"]
-        import torch
-        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-        model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME, torch_dtype=torch.float32)
-        model.eval()
-        _state["tokenizer"] = tokenizer
-        _state["model"] = model
-        return tokenizer, model
+            return _state
+        if BACKEND == "indictrans2":
+            try:
+                _state.update(_load_indictrans2())
+                return _state
+            except Exception as exc:  # gated/network/version mismatch - degrade, don't hard-fail
+                print(f"[sidecar] IndicTrans2 load failed ({exc!r}); falling back to NLLB-200")
+        _state.update(_load_nllb())
+        return _state
 
 
 class TranslateRequest(BaseModel):
@@ -82,7 +126,57 @@ class TranslateResponse(BaseModel):
 
 @app.get("/health")
 async def health() -> dict[str, object]:
-    return {"status": "ok", "model_loaded": bool(_state)}
+    return {
+        "status": "ok",
+        "model_loaded": bool(_state),
+        "backend": _state.get("backend", BACKEND),
+    }
+
+
+def _translate_nllb(text: str, src_tag: str, tgt_tag: str) -> str:
+    import torch
+
+    tokenizer, model = _state["tokenizer"], _state["model"]
+    tokenizer.src_lang = src_tag
+    inputs = tokenizer(text, return_tensors="pt", truncation=True)
+    with torch.no_grad():
+        generated = model.generate(
+            **inputs,
+            forced_bos_token_id=tokenizer.convert_tokens_to_ids(tgt_tag),
+            max_length=256,
+            num_beams=5,
+        )
+    return tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+
+
+def _translate_indictrans2_hop(text: str, src_tag: str, tgt_tag: str, tokenizer_model: tuple) -> str:
+    import torch
+
+    tokenizer, model = tokenizer_model
+    processor = _state["processor"]
+
+    batch = processor.preprocess_batch([text], src_lang=src_tag, tgt_lang=tgt_tag)
+    inputs = tokenizer(batch, truncation=True, padding="longest", return_tensors="pt")
+    with torch.no_grad():
+        generated = model.generate(
+            **inputs,
+            use_cache=True,
+            min_length=0,
+            max_length=256,
+            num_beams=5,
+        )
+    decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
+    return processor.postprocess_batch(decoded, lang=tgt_tag)[0]
+
+
+def _translate_indictrans2(text: str, src_tag: str, tgt_tag: str) -> str:
+    if src_tag == "eng_Latn":
+        return _translate_indictrans2_hop(text, src_tag, tgt_tag, _state["en_indic"])
+    if tgt_tag == "eng_Latn":
+        return _translate_indictrans2_hop(text, src_tag, tgt_tag, _state["indic_en"])
+    # indic -> indic: pivot through English (no indic-indic checkpoint loaded)
+    english = _translate_indictrans2_hop(text, src_tag, "eng_Latn", _state["indic_en"])
+    return _translate_indictrans2_hop(english, "eng_Latn", tgt_tag, _state["en_indic"])
 
 
 @app.post("/translate", response_model=TranslateResponse)
@@ -90,20 +184,13 @@ async def translate(payload: TranslateRequest) -> TranslateResponse:
     if payload.source_language not in _FLORES_TAGS or payload.target_language not in _FLORES_TAGS:
         raise HTTPException(status_code=400, detail="Unsupported language code")
 
-    tokenizer, model = _load()
+    state = _load()
+    src_tag = _FLORES_TAGS[payload.source_language]
+    tgt_tag = _FLORES_TAGS[payload.target_language]
 
-    tokenizer.src_lang = _FLORES_TAGS[payload.source_language]
-    inputs = tokenizer(payload.text, return_tensors="pt", truncation=True)
+    if state["backend"] == "indictrans2":
+        translated = _translate_indictrans2(payload.text, src_tag, tgt_tag)
+    else:
+        translated = _translate_nllb(payload.text, src_tag, tgt_tag)
 
-    import torch
-
-    with torch.no_grad():
-        generated = model.generate(
-            **inputs,
-            forced_bos_token_id=tokenizer.convert_tokens_to_ids(_FLORES_TAGS[payload.target_language]),
-            max_length=256,
-            num_beams=5,
-        )
-
-    translated = tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
     return TranslateResponse(text=translated)

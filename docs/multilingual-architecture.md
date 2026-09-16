@@ -56,7 +56,7 @@ pipeline.
 | `languages.py` | The 13-language metadata table (native name, English name, direction, script) - single source of truth, mirrored on the frontend by `apps/web/src/api/languages.ts`. |
 | `language_detector.py` | `detect_language(text) -> (code, confidence)` via py3langid, restricted to the 13 codes. Pure Python, no native/compiled deps. |
 | `provider.py` | `TranslationProvider` ABC - `translate()`, `supported_languages()`, and a default `detect()` that delegates to `language_detector`. |
-| `indictrans2_provider.py` | Calls the sidecar over HTTP. Named for its original target model (see [Model history](#model-history-indictrans2--nllb-200)) - still the only file that knows which model the sidecar actually runs. Raises `TranslationUnavailableError` if unreachable - never fabricates a translation. |
+| `indictrans2_provider.py` | Calls the sidecar over HTTP. Named for its target model (see [Model history](#model-history-indictrans2--nllb-200--indictrans2-auto-with-nllb-fallback)) - still the only file that knows which model the sidecar actually runs. Raises `TranslationUnavailableError` if unreachable - never fabricates a translation. |
 | `glossary_service.py` | Loads `glossary/terms.yaml`; `protect()`/`restore()` swap protected legal terms for opaque placeholder tokens around a `translate()` call so MT can't paraphrase them. |
 | `translation_validator.py` | Rule-based post-translation checks: section/rule/article references, URLs, and glossary placeholders must match before/after. |
 | `translation_service.py` | The facade `chat/router.py` and `/translate` call - orchestrates protect → translate → restore → validate → safe-fallback-on-failure. |
@@ -74,39 +74,47 @@ integrations, not a new microservices layer. `IndicTrans2Provider` is the
 only file in `apps/api` that knows this detail; everything else talks to
 `TranslationProvider`.
 
-### Model history: IndicTrans2 → NLLB-200
+### Model history: IndicTrans2 → NLLB-200 → IndicTrans2 (auto, with NLLB fallback)
 
-The task asked for AI4Bharat IndicTrans2 specifically. That was tried
-first and hit two dead ends on this machine, in order:
+The task asked for AI4Bharat IndicTrans2 specifically. First attempt hit
+two apparent dead ends, in order:
 
 1. A Python-3.12-venv-on-Windows attempt hit IndicTrans2's required
-   `IndicTransToolkit` library shipping no Windows wheel at all (only
-   manylinux/macOS/PyPy), with a source build needing Cython - blocked by
-   this machine's Windows Application Control policy. Moved the sidecar
-   into a Docker container (Linux) to sidestep this.
-2. Inside the container, all three IndicTrans2 checkpoints
-   (`ai4bharat/indictrans2-{en-indic,indic-en,indic-indic}-dist-*`) turned
-   out to be **gated** on Hugging Face - confirmed via the HF API
-   (`"gated": "auto"`) - needing a logged-in account to click "Agree and
-   access repository" on each of three pages before anything downloads.
-   That's an account action outside what this build could do
-   autonomously.
+   `IndicTransToolkit` library shipping no Windows wheel (only
+   manylinux/macOS/PyPy on PyPI), with a source build needing Cython -
+   blocked by this machine's Windows Application Control policy. Moved
+   the sidecar into a Docker container (Linux) to sidestep this.
+2. Inside the container, IndicTrans2's checkpoints turned out to be
+   **gated** on Hugging Face - confirmed via the HF API (`"gated":
+   "auto"`) - needing a logged-in account to click "Agree and access
+   repository" once per model page. That's an account action outside
+   what this build could do autonomously, so the sidecar switched to
+   **`facebook/nllb-200-distilled-600M`** (confirmed ungated, one model
+   for all 13 languages) rather than block on it.
 
-Rather than block the feature on that manual step, the sidecar now runs
-**`facebook/nllb-200-distilled-600M`** - confirmed ungated via the same
-HF API check, single model covers every direction in the 13-language
-matrix (IndicTrans2 needed three separate checkpoints for en→indic,
-indic→en, indic→indic), and uses the same FLORES-200 language tags
-IndicTrans2 used, so `languages.py`'s code mapping didn't need to change.
-License: `cc-by-nc-4.0` (non-commercial) - fine for this prototype, flag
-it before any commercial deployment. See
-`services/indictrans2-sidecar/README.md` for the full writeup.
+That gate is a one-time human step, not a code blocker, so the sidecar
+now supports both: set `HF_TOKEN` (after accepting the gate on
+`indictrans2-en-indic-dist-200M` and `indictrans2-indic-en-dist-200M`)
+and it runs real IndicTrans2, pivoting Indic→Indic through English with
+those two checkpoints instead of loading the third (indic-indic)
+checkpoint. Without a working token it auto-falls-back to NLLB-200 at
+first request. Also corrected: (1) above was a Windows-host constraint,
+not a container one - `IndicTransToolkit` has a manylinux wheel for
+cp312, so no Cython compiler is needed inside this Linux container
+either. Both backends share the same FLORES-200 tags, so `languages.py`'s
+code mapping needs no change either way. NLLB-200's license is
+`cc-by-nc-4.0` (non-commercial - fine for this prototype, flag before any
+commercial deployment); IndicTrans2 is MIT. See
+`services/indictrans2-sidecar/README.md` for the full writeup and setup
+steps.
 
 ### Sidecar status
 
 Running (`docker compose -f infra/docker-compose.yml up -d indictrans2-sidecar`,
-port 8600). No account or token needed. First `/translate` call downloads
-the model (~2.4GB) and keeps it resident; a Docker volume caches it
+port 8600). Backend is auto-detected from `HF_TOKEN` (see above) or
+forced via `TRANSLATION_BACKEND`. First `/translate` call downloads the
+active backend's weights (~800MB for both IndicTrans2 checkpoints,
+~2.4GB for NLLB-200) and keeps them resident; a Docker volume caches them
 across restarts. If the container isn't up, every non-English request
 still degrades safely: `translation_status: "unavailable"`,
 `needs_human_review: true`, canonical English returned instead of

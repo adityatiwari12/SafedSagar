@@ -171,7 +171,10 @@ export function useChatSession() {
         const loadedTurns: Turn[] = messages.map((m) => ({
           id: nextTurnId(),
           role: m.role,
-          text: m.role === 'user' ? m.display_text : undefined,
+          // Kept for assistant turns too (not just user) - it's the fallback
+          // render path when response_json is missing (rows from before that
+          // column was populated), so the bubble isn't left blank.
+          text: m.display_text,
           response: m.role === 'assistant' ? m.response ?? undefined : undefined,
         }))
         const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')

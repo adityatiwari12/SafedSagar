@@ -23,7 +23,11 @@ from app.translation.provider import TranslationProvider, TranslationResult, Tra
 class IndicTrans2Provider(TranslationProvider):
     name = "indictrans2"
 
-    def __init__(self, base_url: str | None = None, timeout: float = 30.0):
+    # CPU-only NLLB-200/IndicTrans2 inference on this dev machine regularly
+    # takes longer than 30s per call (verified live: sidecar logged a 200 OK
+    # after the client had already given up and reported "unavailable") -
+    # 90s gives real headroom without hanging a request forever.
+    def __init__(self, base_url: str | None = None, timeout: float = 90.0):
         self._base_url = (base_url or settings.indictrans2_sidecar_url).rstrip("/")
         self._timeout = timeout
 
