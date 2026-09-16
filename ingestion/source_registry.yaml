@@ -539,6 +539,107 @@ sources:
     last_verified_date: "2026-09-15"
     fetch: false
 
+  # --- Wave C: user-provided Drive folders "International IP" and
+  # "Biodiversity" (2026-09-16) — fills prior international-jurisdiction
+  # thinness and two documented Biodiversity gaps (Rules 2024 was
+  # previously noted "not verifiable, omit"; ABS Regulations 2025 was
+  # entirely absent). National-Biodiversity-Authority-India.pdf from the
+  # same folder was a scanned image with no text layer - OCR'd (parse.py,
+  # tesseract via pytesseract) once real content was confirmed; see
+  # nba-eu-melon-patent-observation-2016 below. Paris Convention/PCT/TRIPS PDFs in the
+  # same folder duplicate docs already live-fetched above - not re-added.
+
+  - doc_id: wipo-convention-1967
+    title: "Convention Establishing the World Intellectual Property Organization (Stockholm, 14 July 1967)"
+    authority: "World Intellectual Property Organization (WIPO) / United Nations Treaty Series No. 11846"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "provided by project team (docs/data/International IP) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "1967"
+    effective_date: "1970-04-26"
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "WIPO's founding treaty (UN Treaty Series text) - distinct from and not previously in the corpus alongside TRIPS/Paris/PCT/Budapest."
+
+  - doc_id: wipo-madrid-protocol-guide-2018
+    title: "The Madrid Protocol: A Route to Global Branding (January 2018)"
+    authority: "European Union Intellectual Property Office (EUIPO) (secondary explainer, NOT primary WIPO treaty text)"
+    jurisdiction: international
+    doc_type: secondary_analysis
+    source_url: "provided by project team (docs/data/International IP) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "2018-01"
+    effective_date: null
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "EUIPO explainer booklet on the Madrid System for international trademark registration - not the Madrid Protocol's own treaty text (which is not yet in the corpus). reason_and_cite/UI must never present this as primary treaty law."
+
+  - doc_id: wipo-genetic-resources-tk-disclosure-table
+    title: "Disclosure Requirements Table Related to Genetic Resources and/or Traditional Knowledge"
+    authority: "World Intellectual Property Organization (WIPO), compiled from WIPO Lex"
+    jurisdiction: international
+    doc_type: guideline
+    source_url: "provided by project team (docs/data/International IP) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "current"
+    effective_date: null
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "WIPO-compiled table of excerpts from national/regional legislative texts with GR/TK disclosure requirements, sourced from WIPO Lex - a reference compilation, not itself binding law in any one jurisdiction. Directly supports FR-08/FR-09 cross-jurisdiction disclosure questions."
+
+  - doc_id: wipo-ip-traditional-knowledge-booklet
+    title: "Intellectual Property and Traditional Knowledge (WIPO Publication No. 920(E), Booklet No. 2)"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: guideline
+    source_url: "provided by project team (docs/data/International IP) - not re-verified against a live URL this ingestion wave"
+    format: pdf
+    version: "wipo-pub-920E"
+    effective_date: null
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "WIPO explainer booklet, part of a series on IP and genetic resources/TK/traditional cultural expressions - guidance/commentary, not primary law."
+
+  - doc_id: india-biological-diversity-rules-2024
+    title: "The Biological Diversity Rules, 2024"
+    authority: "Ministry of Environment, Forest and Climate Change (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "provided by project team (docs/data/Biodiversity) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2024"
+    effective_date: "2024-12-21"
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "Gazette notification G.S.R. 665(E), notified 22 Oct 2024, effective 60 days from notification per its own commencement clause (matches CLAUDE.md's 'effective late Dec 2024'). Previously noted in this file as 'not verifiable as a direct fetchable file, omit' - this wave's user-provided PDF fills that gap."
+
+  - doc_id: india-abs-regulations-2025
+    title: "Biological Diversity (Access to Biological Resources and Associated Knowledge, and Fair and Equitable Sharing of Benefits Arising from their Utilization) Regulations, 2025"
+    authority: "National Biodiversity Authority (India)"
+    jurisdiction: india
+    doc_type: regulation
+    source_url: "provided by project team (docs/data/Biodiversity) - not re-verified against a live gazette URL this ingestion wave"
+    format: pdf
+    version: "2025"
+    effective_date: "2025-04-30"
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "Notified by NBA (Chennai) 29 Apr 2025 under BD Act ss.18(1)/21(4)/64, gazetted 30 Apr 2025; supersedes the 2014 ABS Regulations. Previously entirely absent from the corpus - core document for FR-08 ABS assistant."
+
+  - doc_id: nba-eu-melon-patent-observation-2016
+    title: "NBA Observation Filed with the European Patent Office on Non-Compliance with the Biological Diversity Act, 2002 (re: EP 1962578 B1, 'Closterovirus-resistant Melon Plants')"
+    authority: "National Biodiversity Authority (India)"
+    jurisdiction: india
+    doc_type: notification
+    source_url: "provided by project team (docs/data/Biodiversity) - scanned letter, OCR'd, not re-verified against a live URL"
+    format: pdf
+    version: "2016"
+    effective_date: "2016-01-04"
+    last_verified_date: "2026-09-16"
+    fetch: false
+    notes: "Real enforcement case: NBA filed an Article 115 EPC observation against Monsanto's EP 1962578 B1 for using an Indian melon germplasm accession without BD Act s.6 prior approval, citing CBD Art.15 and the Nagoya Protocol. Directly supports FR-09 (bio-piracy/prior-art outcomes) alongside the tkdl-bio-piracy-outcomes entries below. Source PDF had no text layer (scanned, page.rotation=90) - extracted via OCR fallback in ingestion/parse.py."
+
   - doc_id: tkdl-bio-piracy-outcomes
     title: "TKDL - Outcomes Against Bio-piracy"
     authority: "Traditional Knowledge Digital Library (CSIR / Ministry of AYUSH)"
