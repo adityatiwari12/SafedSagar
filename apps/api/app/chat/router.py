@@ -28,6 +28,8 @@ from app.chat.schemas import (
 from app.db.base import AsyncSessionLocal
 from app.db.models import (
     Case,
+    CaseQueue,
+    CaseRiskLevel,
     CaseStatus,
     Conversation,
     EscalationItem,
@@ -584,9 +586,9 @@ async def create_escalation(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> EscalateResponse:
-    """User-initiated escalation (the Escalate button), independent of
-    escalate_if_needed's automatic decision - always creates a fresh open
-    case for the conversation's latest turn."""
+    """User-initiated escalation (the Escalate button) - marks the most
+    recent Case for this conversation as escalated to the ip queue,
+    independent of the automatic risk-based routing at answer time."""
     try:
         conversation_uuid = uuid.UUID(payload.conversationId)
     except ValueError as exc:
@@ -596,16 +598,30 @@ async def create_escalation(
     if conversation is None or conversation.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
-    item = EscalationItem(
-        conversation_id=conversation.id,
-        status=EscalationStatus.open,
-        reason="User requested escalation to a human facilitator.",
+    result = await db.execute(
+        select(Case)
+        .where(Case.conversation_id == conversation_uuid)
+        .order_by(Case.created_at.desc())
+        .limit(1)
     )
-    db.add(item)
+    case = result.scalar_one_or_none()
+    if case is None:
+        case = Case(
+            user_id=current_user.id,
+            conversation_id=conversation.id,
+            question="User requested escalation to a human facilitator.",
+            risk_level=CaseRiskLevel.high,
+            status=CaseStatus.escalated,
+            queue=CaseQueue.ip,
+        )
+        db.add(case)
+    else:
+        case.status = CaseStatus.escalated
+        case.queue = case.queue or CaseQueue.ip
     await db.commit()
-    await db.refresh(item)
+    await db.refresh(case)
 
-    return EscalateResponse(escalation_id=str(item.id))
+    return EscalateResponse(escalation_id=str(case.id))
 
 
 def _make_title(message: Message | None) -> str:

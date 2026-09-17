@@ -1,16 +1,18 @@
-"""Tests for the escalation case queue and admin user list - inserts
-EscalationItem/Conversation/Message rows directly (no live LLM call
-needed to exercise these routes)."""
+"""Tests for the case queue and admin user list - inserts Case/
+Conversation/Message rows directly (no live LLM call needed to exercise
+these routes)."""
 
 import uuid
 
 from app.db.base import AsyncSessionLocal
-from app.db.models import Conversation, EscalationItem, EscalationStatus, Message, MessageRole, UserRole
+from app.db.models import (
+    Case, CaseQueue, CaseRiskLevel, CaseStatus, Conversation, Message, MessageRole, UserRole,
+)
 
 
-async def _seed_open_case(user_email_suffix: str) -> tuple[str, str]:
-    """Insert a user + conversation + messages + open EscalationItem.
-    Returns (case_id, user_email)."""
+async def _seed_case(user_email_suffix: str, queue: CaseQueue = CaseQueue.ip) -> tuple[str, str]:
+    """Insert a user + conversation + messages + escalated Case in the
+    given queue. Returns (case_id, user_email)."""
     from app.auth.security import hash_password
     from app.db.models import User
 
@@ -30,18 +32,21 @@ async def _seed_open_case(user_email_suffix: str) -> tuple[str, str]:
         session.add(Message(conversation_id=conversation.id, role=MessageRole.user, content="Q?"))
         session.add(Message(conversation_id=conversation.id, role=MessageRole.assistant, content="A."))
 
-        item = EscalationItem(
+        case = Case(
+            user_id=user.id,
             conversation_id=conversation.id,
-            status=EscalationStatus.open,
-            reason="test reason",
+            question="Q?",
             product_classification="unclear",
             jurisdiction="india",
             confidence_score=0.1,
             confidence_level="low",
+            risk_level=CaseRiskLevel.high,
+            status=CaseStatus.escalated,
+            queue=queue,
         )
-        session.add(item)
+        session.add(case)
         await session.commit()
-        return str(item.id), user.email
+        return str(case.id), user.email
 
 
 async def test_case_queue_requires_facilitator_role(client, make_user):
@@ -51,7 +56,7 @@ async def test_case_queue_requires_facilitator_role(client, make_user):
 
 
 async def test_case_queue_lists_open_case(client, make_user):
-    case_id, user_email = await _seed_open_case(uuid.uuid4().hex[:8])
+    case_id, user_email = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.ip)
     _email, _password, fac_token = await make_user(role="facilitator")
 
     resp = await client.get("/cases", headers={"Authorization": f"Bearer {fac_token}"})
@@ -62,23 +67,48 @@ async def test_case_queue_lists_open_case(client, make_user):
     assert match["question"] == "Q?"
     assert match["answer"] == "A."
     assert match["user_email"] == user_email
-    assert match["status"] == "open"
+    assert match["status"] == "escalated"
+    assert match["queue"] == "ip"
 
 
-async def test_regulatory_expert_can_also_see_and_claim_case(client, make_user):
-    case_id, _user_email = await _seed_open_case(uuid.uuid4().hex[:8])
-    _email, _password, expert_token = await make_user(role="regulatory_expert")
+async def test_facilitator_does_not_see_legal_queue_cases(client, make_user):
+    """Queue scoping (spec Section 8): a facilitator's ip-queue grant must
+    not surface cases routed to the legal queue."""
+    legal_case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.legal)
+    _email, _password, fac_token = await make_user(role="facilitator")
 
-    claim_resp = await client.post(
-        f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {expert_token}"}
-    )
-    assert claim_resp.status_code == 200
-    assert claim_resp.json()["status"] == "in_progress"
-    assert claim_resp.json()["assigned_facilitator_email"] is not None
+    resp = await client.get("/cases", headers={"Authorization": f"Bearer {fac_token}"})
+    assert resp.status_code == 200
+    case_ids = {c["id"] for c in resp.json()}
+    assert legal_case_id not in case_ids
+
+
+async def test_legal_expert_sees_only_legal_queue(client, make_user):
+    legal_case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.legal)
+    ip_case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.ip)
+    _email, _password, legal_token = await make_user(role="legal_expert")
+
+    resp = await client.get("/cases", headers={"Authorization": f"Bearer {legal_token}"})
+    assert resp.status_code == 200
+    case_ids = {c["id"] for c in resp.json()}
+    assert legal_case_id in case_ids
+    assert ip_case_id not in case_ids
+
+
+async def test_regulatory_expert_sees_only_regulatory_queue(client, make_user):
+    reg_case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.regulatory)
+    ip_case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.ip)
+    _email, _password, reg_token = await make_user(role="regulatory_expert")
+
+    resp = await client.get("/cases", headers={"Authorization": f"Bearer {reg_token}"})
+    assert resp.status_code == 200
+    case_ids = {c["id"] for c in resp.json()}
+    assert reg_case_id in case_ids
+    assert ip_case_id not in case_ids
 
 
 async def test_close_case_sets_resolution(client, make_user):
-    case_id, _user_email = await _seed_open_case(uuid.uuid4().hex[:8])
+    case_id, _user_email = await _seed_case(uuid.uuid4().hex[:8])
     _email, _password, fac_token = await make_user(role="facilitator")
 
     resp = await client.post(
@@ -99,6 +129,37 @@ async def test_claim_nonexistent_case_404(client, make_user):
         f"/cases/{uuid.uuid4()}/claim", headers={"Authorization": f"Bearer {fac_token}"}
     )
     assert resp.status_code == 404
+
+
+async def test_review_action_requires_assigned_reviewer(client, make_user):
+    """can_perform_action's ownership check (app.authz.service): only the
+    facilitator who claimed the case may review it."""
+    case_id, _ = await _seed_case(uuid.uuid4().hex[:8])
+    _email, _password, fac_token = await make_user(role="facilitator")
+    claim_resp = await client.post(f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {fac_token}"})
+    assert claim_resp.status_code == 200
+
+    _email2, _password2, other_fac_token = await make_user(role="facilitator")
+    review_resp = await client.post(
+        f"/cases/{case_id}/review",
+        headers={"Authorization": f"Bearer {other_fac_token}"},
+        json={"action": "approve", "notes": "looks fine"},
+    )
+    assert review_resp.status_code == 403
+
+
+async def test_review_action_approve_by_assigned_reviewer(client, make_user):
+    case_id, _ = await _seed_case(uuid.uuid4().hex[:8])
+    _email, _password, fac_token = await make_user(role="facilitator")
+    await client.post(f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {fac_token}"})
+
+    resp = await client.post(
+        f"/cases/{case_id}/review",
+        headers={"Authorization": f"Bearer {fac_token}"},
+        json={"action": "approve", "notes": "looks fine"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["action"] == "approve"
 
 
 async def test_admin_users_requires_users_manage_permission(client, make_user):

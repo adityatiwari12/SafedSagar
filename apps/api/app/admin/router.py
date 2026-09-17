@@ -20,8 +20,6 @@ from app.authz.constants import Permission
 from app.authz.service import AuthzContext, has_permission, require_permission
 from app.db.models import (
     AuditLogEntry,
-    EscalationItem,
-    EscalationStatus,
     Organization,
     OrganizationType,
     Role,
@@ -50,14 +48,16 @@ async def platform_stats(
     _ctx: AuthzContext = Depends(require_permission(Permission.ANALYTICS_NATIONAL)),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    from app.db.models import Case, CaseStatus
+
     role_counts = await db.execute(select(User.role, func.count()).group_by(User.role))
     users_by_role = {role.value: count for role, count in role_counts.all()}
 
     open_cases = await db.scalar(
-        select(func.count()).select_from(EscalationItem).where(EscalationItem.status == EscalationStatus.open)
+        select(func.count()).select_from(Case).where(Case.status.in_([CaseStatus.escalated, CaseStatus.in_progress, CaseStatus.awaiting_user_input]))
     )
     closed_cases = await db.scalar(
-        select(func.count()).select_from(EscalationItem).where(EscalationItem.status == EscalationStatus.closed)
+        select(func.count()).select_from(Case).where(Case.status == CaseStatus.closed)
     )
 
     return {
