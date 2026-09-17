@@ -110,6 +110,49 @@ class KnowledgeAccessRole(str, enum.Enum):
     regulatory_expert = "regulatory_expert"
 
 
+class CaseStatus(str, enum.Enum):
+    """Case lifecycle (spec Section 6). Supersedes EscalationStatus's
+    3-value set - `escalated` and `resolved` split what EscalationStatus
+    collapsed into `open`, matching Case's "every question becomes a row,
+    low/medium-risk auto-resolved" model (spec Section 6)."""
+
+    open = "open"
+    in_progress = "in_progress"
+    awaiting_user_input = "awaiting_user_input"
+    escalated = "escalated"
+    resolved = "resolved"
+    closed = "closed"
+
+
+class CaseRiskLevel(str, enum.Enum):
+    """Derived by app.cases.service from the graph's escalate/
+    confidence_level output - not a new AI call (see Task 2)."""
+
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
+class CaseQueue(str, enum.Enum):
+    """Which expert queue a case belongs to. NULL for a non-escalated
+    (auto-resolved) case - queue only matters once a case needs a human.
+    Routing rule: app.cases.service, spec Section 8."""
+
+    ip = "ip"
+    regulatory = "regulatory"
+    legal = "legal"
+
+
+class ExpertReviewAction(str, enum.Enum):
+    """One reviewer action on a case (spec Section 6)."""
+
+    approve = "approve"
+    modify = "modify"
+    reject = "reject"
+    request_info = "request_info"
+    escalate = "escalate"
+
+
 class User(Base):
     """A platform user (end user, facilitator, or admin)."""
 
@@ -215,7 +258,15 @@ class Message(Base):
 
 
 class EscalationItem(Base):
-    """A conversation escalated to a human facilitator."""
+    """A conversation escalated to a human facilitator.
+
+    DEPRECATED as of docs/product/rbac-full-implementation-spec.md Phase
+    2: superseded by `Case`, which persists a row for every answered
+    turn (not just escalated ones) and carries risk_level/queue/
+    expert_reviews. This table and class stay only for the expand->
+    migrate->contract window - no new code reads or writes it after this
+    change. Dropped in a follow-up migration once confirmed unused.
+    """
 
     __tablename__ = "escalation_items"
 
@@ -457,3 +508,86 @@ class UserRoleAssignment(Base):
     user: Mapped["User"] = relationship(back_populates="role_assignments")
     role: Mapped["Role"] = relationship()
     organization: Mapped["Organization | None"] = relationship()
+
+
+class Case(Base):
+    """Every answered chat turn, not just escalated ones (spec Section 6,
+    Build order item 2) - supersedes EscalationItem, which only persisted
+    a row when escalate_if_needed flagged one. Low/medium-risk cases are
+    created already `resolved`; only high-risk ones land in a queue."""
+
+    __tablename__ = "cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"), nullable=True)
+
+    question: Mapped[str] = mapped_column(String, nullable=False)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
+    product_classification: Mapped[str | None] = mapped_column(String, nullable=True)
+    # List[str] subset of app.graph.state.IP_TYPES - named ip_types (not
+    # the spec's "ip_domain") to match the field name already used
+    # throughout app/graph and app/chat, not introduce a second name for
+    # the same data.
+    ip_types: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    jurisdiction: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Reserved for a not-yet-built regulatory-compliance module (spec
+    # Phase 10) - always NULL until that module exists. Included now so
+    # that module doesn't need its own migration just to add this column.
+    regulatory_issues: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    abs_tk_flags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Snapshot for a reviewer: {"classification": ..., "next_steps": [...],
+    # "timing_ms": {...}} - same shape as ChatTurnResponse minus the
+    # citations (which get their own column below).
+    ai_analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    citations: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    confidence_score: Mapped[float | None] = mapped_column(nullable=True)
+    confidence_level: Mapped[str | None] = mapped_column(String, nullable=True)
+    risk_level: Mapped[CaseRiskLevel] = mapped_column(SAEnum(CaseRiskLevel, name="case_risk_level"), nullable=False)
+    status: Mapped[CaseStatus] = mapped_column(SAEnum(CaseStatus, name="case_status"), nullable=False)
+    queue: Mapped[CaseQueue | None] = mapped_column(SAEnum(CaseQueue, name="case_queue"), nullable=True)
+
+    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    resolution_summary: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
+    assigned_to: Mapped["User | None"] = relationship(foreign_keys=[assigned_to_user_id])
+    organization: Mapped["Organization | None"] = relationship()
+    conversation: Mapped["Conversation | None"] = relationship()
+
+
+class ExpertReview(Base):
+    """One reviewer action on a Case (spec Section 6). A case can have
+    several - the full review history, not just the latest action."""
+
+    __tablename__ = "expert_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    case_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cases.id"), nullable=False)
+    reviewer_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Denormalized at write time (which role the reviewer acted under) -
+    # a user's roles can change later; this records what was true then.
+    reviewer_role: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[ExpertReviewAction] = mapped_column(
+        SAEnum(ExpertReviewAction, name="expert_review_action"), nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    previous_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    new_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    case: Mapped["Case"] = relationship()
+    reviewer: Mapped["User"] = relationship()

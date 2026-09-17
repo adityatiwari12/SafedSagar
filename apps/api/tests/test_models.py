@@ -129,6 +129,51 @@ async def test_conversation_message_escalation_and_audit_log_round_trip():
 
 
 @pytest.mark.asyncio
+async def test_case_and_expert_review_round_trip():
+    from app.db.models import (
+        Case, CaseQueue, CaseRiskLevel, CaseStatus, ExpertReview, ExpertReviewAction,
+        User, UserRole,
+    )
+    from app.auth.security import hash_password
+
+    async with AsyncSessionLocal() as session:
+        user = User(
+            email=f"case-model-{uuid.uuid4()}@example.test",
+            hashed_password=hash_password("testpass123"),
+            role=UserRole.user,
+        )
+        session.add(user)
+        await session.flush()
+
+        case = Case(
+            user_id=user.id,
+            question="Can I patent this?",
+            risk_level=CaseRiskLevel.high,
+            status=CaseStatus.escalated,
+            queue=CaseQueue.ip,
+        )
+        session.add(case)
+        await session.flush()
+
+        review = ExpertReview(
+            case_id=case.id,
+            reviewer_user_id=user.id,
+            reviewer_role="facilitator",
+            action=ExpertReviewAction.approve,
+            notes="Looks right.",
+        )
+        session.add(review)
+        await session.commit()
+        await session.refresh(case)
+        await session.refresh(review)
+
+        assert case.status == CaseStatus.escalated
+        assert case.queue == CaseQueue.ip
+        assert review.case_id == case.id
+        assert review.action == ExpertReviewAction.approve
+
+
+@pytest.mark.asyncio
 async def test_source_document_round_trip():
     doc_id = f"ipindia-patents-act-1970-{uuid.uuid4().hex[:8]}"
     chunk_id = f"{doc_id}#s3p"
