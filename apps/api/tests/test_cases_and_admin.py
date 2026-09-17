@@ -4,10 +4,22 @@ these routes)."""
 
 import uuid
 
+from sqlalchemy import select
+
 from app.db.base import AsyncSessionLocal
 from app.db.models import (
-    Case, CaseQueue, CaseRiskLevel, CaseStatus, Conversation, Message, MessageRole, UserRole,
+    AuditLogEntry, Case, CaseQueue, CaseRiskLevel, CaseStatus, Conversation, Message, MessageRole, UserRole,
 )
+
+
+async def _audit_actions_for_case(case_id: str) -> list[str]:
+    """Every AuditLogEntry.action recorded with this case_id in `detail`
+    (spec's audit-trail requirement, Global Constraints) - queried
+    directly rather than via an endpoint, since audit rows aren't
+    exposed through /cases."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(AuditLogEntry.action, AuditLogEntry.detail))
+        return [action for action, detail in result.all() if detail and detail.get("case_id") == case_id]
 
 
 async def _seed_case(user_email_suffix: str, queue: CaseQueue = CaseQueue.ip) -> tuple[str, str]:
@@ -121,6 +133,7 @@ async def test_close_case_sets_resolution(client, make_user):
     assert body["status"] == "closed"
     assert body["resolution_summary"] == "resolved in test"
     assert body["closed_at"] is not None
+    assert "case.close" in await _audit_actions_for_case(case_id)
 
 
 async def test_claim_nonexistent_case_404(client, make_user):
@@ -160,6 +173,9 @@ async def test_review_action_approve_by_assigned_reviewer(client, make_user):
     )
     assert resp.status_code == 200
     assert resp.json()["action"] == "approve"
+    actions = await _audit_actions_for_case(case_id)
+    assert "case.claim" in actions
+    assert "case.review" in actions
 
 
 async def test_admin_users_requires_users_manage_permission(client, make_user):

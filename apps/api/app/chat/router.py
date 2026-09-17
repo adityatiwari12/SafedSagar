@@ -27,6 +27,7 @@ from app.chat.schemas import (
 )
 from app.db.base import AsyncSessionLocal
 from app.db.models import (
+    AuditLogEntry,
     Case,
     CaseQueue,
     CaseRiskLevel,
@@ -618,6 +619,15 @@ async def create_escalation(
     else:
         case.status = CaseStatus.escalated
         case.queue = case.queue or CaseQueue.ip
+
+    await db.flush()
+    db.add(
+        AuditLogEntry(
+            actor_user_id=current_user.id,
+            action="case.user_escalate",
+            detail={"case_id": str(case.id), "conversation_id": str(conversation.id)},
+        )
+    )
     await db.commit()
     await db.refresh(case)
 

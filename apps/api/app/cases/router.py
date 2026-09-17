@@ -16,7 +16,7 @@ from app.auth.dependencies import get_db
 from app.authz.constants import Permission, RoleName
 from app.authz.service import AuthzContext, can_access_resource, require_permission
 from app.cases.schemas import CaseOut, CloseCaseRequest, ReviewActionOut, ReviewActionRequest
-from app.db.models import Case, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction, User
+from app.db.models import AuditLogEntry, Case, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction, User
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -116,6 +116,13 @@ async def claim_case(
 
     case.assigned_to_user_id = ctx.user.id
     case.status = CaseStatus.in_progress
+    db.add(
+        AuditLogEntry(
+            actor_user_id=ctx.user.id,
+            action="case.claim",
+            detail={"case_id": str(case.id)},
+        )
+    )
     await db.commit()
     await db.refresh(case)
     return await _to_case_out(db, case)
@@ -125,7 +132,7 @@ async def claim_case(
 async def close_case(
     case_id: uuid.UUID,
     payload: CloseCaseRequest,
-    _ctx: AuthzContext = Depends(require_permission(Permission.CASE_CLOSE)),
+    ctx: AuthzContext = Depends(require_permission(Permission.CASE_CLOSE)),
     db: AsyncSession = Depends(get_db),
 ) -> CaseOut:
     case = await db.get(Case, case_id)
@@ -135,6 +142,13 @@ async def close_case(
     case.status = CaseStatus.closed
     case.closed_at = datetime.now(timezone.utc)
     case.resolution_summary = payload.resolution_summary
+    db.add(
+        AuditLogEntry(
+            actor_user_id=ctx.user.id,
+            action="case.close",
+            detail={"case_id": str(case.id), "resolution_summary": payload.resolution_summary},
+        )
+    )
     await db.commit()
     await db.refresh(case)
     return await _to_case_out(db, case)
@@ -174,6 +188,13 @@ async def review_case(
         previous_state={"status": case.status.value},
     )
     db.add(review)
+    db.add(
+        AuditLogEntry(
+            actor_user_id=ctx.user.id,
+            action="case.review",
+            detail={"case_id": str(case.id), "review_action": action.value, "reviewer_role": reviewer_role},
+        )
+    )
 
     if action == ExpertReviewAction.escalate:
         case.status = CaseStatus.escalated
