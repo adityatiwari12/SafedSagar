@@ -13,6 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, get_db, resolve_user_from_token
+from app.cases.service import derive_case_outcome
 from app.chat.schemas import (
     AbsTkFlagsOut,
     ChatTurnRequest,
@@ -26,6 +27,8 @@ from app.chat.schemas import (
 )
 from app.db.base import AsyncSessionLocal
 from app.db.models import (
+    Case,
+    CaseStatus,
     Conversation,
     EscalationItem,
     EscalationStatus,
@@ -213,6 +216,53 @@ def _abs_tk_flags(state: GraphState) -> AbsTkFlagsOut | None:
     )
 
 
+async def _create_case(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    conversation: Conversation,
+    question: str,
+    target_language: str,
+    state: GraphState,
+    response: "ChatTurnResponse",
+) -> Case:
+    """Persist a Case for this turn - every answered turn (including an
+    out-of-scope refusal), never a clarifying-question round (spec
+    Section 6, Build order item 2: "every question becomes a Case row" -
+    scoped here to turns that actually reached an answer, since a
+    clarifying round isn't yet an answer to assess)."""
+    outcome = derive_case_outcome(
+        escalate=state.get("escalate", False),
+        confidence_level=response.confidence_band,
+        product_classification=response.classification.product_type,
+        ip_types=state.get("ip_types", []),
+        abs_tk_flags=response.abs_tk_flags.model_dump() if response.abs_tk_flags else None,
+    )
+    case = Case(
+        user_id=current_user.id,
+        conversation_id=conversation.id,
+        question=question,
+        language=target_language,
+        product_classification=response.classification.product_type,
+        ip_types=state.get("ip_types", []),
+        jurisdiction=response.jurisdiction,
+        abs_tk_flags=response.abs_tk_flags.model_dump() if response.abs_tk_flags else None,
+        ai_analysis={
+            "classification": response.classification.model_dump(),
+            "next_steps": response.next_steps,
+            "timing_ms": response.timing_ms,
+        },
+        citations=[c.model_dump() for c in response.citations],
+        confidence_score=response.confidence,
+        confidence_level=response.confidence_band,
+        risk_level=outcome.risk_level,
+        status=outcome.status,
+        queue=outcome.queue,
+    )
+    db.add(case)
+    return case
+
+
 async def _process_chat_turn(
     payload: ChatTurnRequest,
     current_user: User,
@@ -323,6 +373,15 @@ async def _process_chat_turn(
                     response_json=response.model_dump(),
                     language=target_language,
                 )
+            )
+            await _create_case(
+                db,
+                current_user=current_user,
+                conversation=conversation,
+                question=canonical_text,
+                target_language=target_language,
+                state=classify_state,
+                response=response,
             )
             await db.commit()
             return response
@@ -445,18 +504,15 @@ async def _process_chat_turn(
         )
     )
 
-    if state.get("escalate"):
-        db.add(
-            EscalationItem(
-                conversation_id=conversation.id,
-                status=EscalationStatus.open,
-                reason=state.get("escalation_reason"),
-                product_classification=state.get("product_classification"),
-                jurisdiction=state.get("jurisdiction"),
-                confidence_score=state.get("confidence_score"),
-                confidence_level=state.get("confidence_level"),
-            )
-        )
+    case = await _create_case(
+        db,
+        current_user=current_user,
+        conversation=conversation,
+        question=canonical_text,
+        target_language=target_language,
+        state=state,
+        response=response,
+    )
 
     await db.commit()
     return response
