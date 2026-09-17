@@ -190,3 +190,19 @@ def test_can_perform_action_requires_both_permission_and_access():
 
     assert not can_perform_action(ctx_with_permission_no_access, _Product(), "product.edit")
     assert not can_perform_action(ctx_with_access_no_permission, _Product(), "product.edit")
+
+
+def test_only_reviewer_roles_map_to_a_queue():
+    """app.cases.router._ROLE_QUEUE must cover exactly the three reviewer
+    roles that hold case.view_queue (spec Section 4's matrix) - if a
+    future role gains case.view_queue without a queue mapping, list_cases
+    silently returns an empty queue for it (fail-closed, Task 4) rather
+    than crashing, but that's worth catching in review, not discovering
+    live. This test fails loudly instead."""
+    from app.cases.router import _ROLE_QUEUE
+    from app.authz.constants import Permission, ROLE_PERMISSIONS
+
+    roles_with_view_queue = {
+        role for role, perms in ROLE_PERMISSIONS.items() if Permission.CASE_VIEW_QUEUE in perms
+    }
+    assert set(_ROLE_QUEUE.keys()) == roles_with_view_queue
