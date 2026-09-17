@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_db
 from app.authz.constants import Permission, RoleName
-from app.authz.service import AuthzContext, can_access_resource, require_permission
+from app.authz.service import AuthzContext, can_access_resource, has_any_grant, require_permission
 from app.cases.schemas import CaseOut, CloseCaseRequest, ReviewActionOut, ReviewActionRequest
 from app.db.models import AuditLogEntry, Case, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction, User
 
@@ -30,6 +30,18 @@ _ROLE_QUEUE: dict[str, CaseQueue] = {
     RoleName.FACILITATOR: CaseQueue.ip,
     RoleName.LEGAL_EXPERT: CaseQueue.legal,
     RoleName.REGULATORY_EXPERT: CaseQueue.regulatory,
+}
+
+# Which specific permission gates each /review action. request_info has no
+# dedicated permission key in app.authz.constants - treated as covered by
+# REVIEW_APPROVE (every reviewer role that can approve can also ask for
+# more info).
+_ACTION_PERMISSION: dict[ExpertReviewAction, str] = {
+    ExpertReviewAction.approve: Permission.REVIEW_APPROVE,
+    ExpertReviewAction.modify: Permission.REVIEW_MODIFY,
+    ExpertReviewAction.reject: Permission.REVIEW_REJECT,
+    ExpertReviewAction.escalate: Permission.REVIEW_ESCALATE,
+    ExpertReviewAction.request_info: Permission.REVIEW_APPROVE,
 }
 
 
@@ -97,7 +109,10 @@ async def list_cases(
 
     stmt = select(Case).where(Case.queue.in_(allowed_queues)).order_by(Case.created_at.desc())
     if status_filter:
-        stmt = stmt.where(Case.status == CaseStatus(status_filter))
+        try:
+            stmt = stmt.where(Case.status == CaseStatus(status_filter))
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status_filter")
 
     result = await db.execute(stmt)
     cases = list(result.scalars().all())
@@ -113,6 +128,13 @@ async def claim_case(
     case = await db.get(Case, case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+
+    role_names = await _caller_role_names(ctx, db)
+    allowed_queues = {_ROLE_QUEUE[r] for r in role_names if r in _ROLE_QUEUE}
+    if case.queue not in allowed_queues:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Case not in your queue")
+    if case.assigned_to_user_id is not None and case.assigned_to_user_id != ctx.user.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Case already claimed by another reviewer")
 
     case.assigned_to_user_id = ctx.user.id
     case.status = CaseStatus.in_progress
@@ -138,6 +160,8 @@ async def close_case(
     case = await db.get(Case, case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    if not can_access_resource(ctx, case):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your assigned case")
 
     case.status = CaseStatus.closed
     case.closed_at = datetime.now(timezone.utc)
@@ -158,13 +182,18 @@ async def close_case(
 async def review_case(
     case_id: uuid.UUID,
     payload: ReviewActionRequest,
-    ctx: AuthzContext = Depends(require_permission(Permission.REVIEW_APPROVE)),
+    ctx: AuthzContext = Depends(require_permission(Permission.REVIEW_VIEW)),
     db: AsyncSession = Depends(get_db),
 ) -> ReviewActionOut:
     """Record a reviewer action. Only the case's assigned reviewer may act
     on it (can_access_resource's ownership check via assigned_to_user_id) -
     holding review.approve at all is necessary but not sufficient (spec
-    Section 5's can_perform_action distinction)."""
+    Section 5's can_perform_action distinction). The route-entry dependency
+    only guards review.view (the broadest grant every reviewer role holds);
+    the specific permission for the requested action is checked below, since
+    a single action (e.g. escalate) may not be granted to every role that
+    can otherwise review (e.g. legal_expert has no higher tier to escalate
+    to)."""
     case = await db.get(Case, case_id)
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
@@ -176,8 +205,12 @@ async def review_case(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action") from exc
 
+    required = _ACTION_PERMISSION[action]
+    if not has_any_grant(ctx, required):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing permission: {required}")
+
     role_names = await _caller_role_names(ctx, db)
-    reviewer_role = next((r for r in role_names if r in _ROLE_QUEUE), "facilitator")
+    reviewer_role = next((r for r in sorted(role_names) if r in _ROLE_QUEUE), "facilitator")
 
     review = ExpertReview(
         case_id=case.id,

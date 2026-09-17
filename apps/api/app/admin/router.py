@@ -54,7 +54,7 @@ async def platform_stats(
     users_by_role = {role.value: count for role, count in role_counts.all()}
 
     open_cases = await db.scalar(
-        select(func.count()).select_from(Case).where(Case.status.in_([CaseStatus.escalated, CaseStatus.in_progress, CaseStatus.awaiting_user_input]))
+        select(func.count()).select_from(Case).where(Case.status.in_([CaseStatus.open, CaseStatus.escalated, CaseStatus.in_progress, CaseStatus.awaiting_user_input]))
     )
     closed_cases = await db.scalar(
         select(func.count()).select_from(Case).where(Case.status == CaseStatus.closed)

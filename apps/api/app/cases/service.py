@@ -33,6 +33,9 @@ def derive_case_outcome(
     ip_types: list[str],
     abs_tk_flags: dict | None,
 ) -> CaseOutcome:
+    ip_types = ip_types or []
+    safe_abs_tk_flags = abs_tk_flags if isinstance(abs_tk_flags, dict) else {}
+
     if not escalate:
         risk = CaseRiskLevel.medium if confidence_level == "medium" else CaseRiskLevel.low
         return CaseOutcome(risk_level=risk, status=CaseStatus.resolved, queue=None)
@@ -43,8 +46,8 @@ def derive_case_outcome(
         product_classification == "unclear"
         or bool(_LEGAL_TRIGGER_IP_TYPES & set(ip_types))
         or bool(
-            abs_tk_flags
-            and (abs_tk_flags.get("biological_resource_likely") or abs_tk_flags.get("traditional_knowledge_likely"))
+            safe_abs_tk_flags.get("biological_resource_likely")
+            or safe_abs_tk_flags.get("traditional_knowledge_likely")
         )
     )
     if risk == CaseRiskLevel.high or is_ambiguous_or_sensitive:
@@ -54,4 +57,4 @@ def derive_case_outcome(
     else:
         queue = CaseQueue.ip
 
-    return CaseOutcome(risk_level=risk, status=CaseStatus.escalated, queue=queue)
+    return CaseOutcome(risk_level=risk, status=CaseStatus.open, queue=queue)

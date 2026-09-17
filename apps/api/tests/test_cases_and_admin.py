@@ -122,6 +122,8 @@ async def test_regulatory_expert_sees_only_regulatory_queue(client, make_user):
 async def test_close_case_sets_resolution(client, make_user):
     case_id, _user_email = await _seed_case(uuid.uuid4().hex[:8])
     _email, _password, fac_token = await make_user(role="facilitator")
+    claim_resp = await client.post(f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {fac_token}"})
+    assert claim_resp.status_code == 200
 
     resp = await client.post(
         f"/cases/{case_id}/close",
@@ -142,6 +144,70 @@ async def test_claim_nonexistent_case_404(client, make_user):
         f"/cases/{uuid.uuid4()}/claim", headers={"Authorization": f"Bearer {fac_token}"}
     )
     assert resp.status_code == 404
+
+
+async def test_claim_case_outside_queue_forbidden(client, make_user):
+    """A facilitator (ip queue) must not be able to claim a case routed to
+    the legal queue - claim_case previously only checked CASE_ASSIGN, with
+    no queue-scope check."""
+    legal_case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.legal)
+    _email, _password, fac_token = await make_user(role="facilitator")
+
+    resp = await client.post(
+        f"/cases/{legal_case_id}/claim", headers={"Authorization": f"Bearer {fac_token}"}
+    )
+    assert resp.status_code == 403
+
+
+async def test_claim_already_claimed_case_conflict(client, make_user):
+    """A second facilitator must not be able to steal a case already
+    assigned to a different facilitator."""
+    case_id, _ = await _seed_case(uuid.uuid4().hex[:8])
+    _email, _password, fac_token = await make_user(role="facilitator")
+    first_claim = await client.post(f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {fac_token}"})
+    assert first_claim.status_code == 200
+
+    _email2, _password2, other_fac_token = await make_user(role="facilitator")
+    second_claim = await client.post(
+        f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {other_fac_token}"}
+    )
+    assert second_claim.status_code == 409
+
+
+async def test_close_case_requires_assigned_reviewer(client, make_user):
+    """Mirrors test_review_action_requires_assigned_reviewer: only the
+    facilitator who claimed the case may close it."""
+    case_id, _ = await _seed_case(uuid.uuid4().hex[:8])
+    _email, _password, fac_token = await make_user(role="facilitator")
+    claim_resp = await client.post(f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {fac_token}"})
+    assert claim_resp.status_code == 200
+
+    _email2, _password2, other_fac_token = await make_user(role="facilitator")
+    close_resp = await client.post(
+        f"/cases/{case_id}/close",
+        headers={"Authorization": f"Bearer {other_fac_token}"},
+        json={"resolution_summary": "trying to close someone else's case"},
+    )
+    assert close_resp.status_code == 403
+
+
+async def test_legal_expert_cannot_escalate_no_higher_tier(client, make_user):
+    """legal_expert never holds Permission.REVIEW_ESCALATE (it's the top
+    review tier - nothing to escalate to, per app.authz.constants'
+    ROLE_PERMISSIONS[RoleName.LEGAL_EXPERT]) - review_case must reject an
+    escalate action from this role even though it gates the route on the
+    broader review.view permission."""
+    case_id, _ = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.legal)
+    _email, _password, legal_token = await make_user(role="legal_expert")
+    claim_resp = await client.post(f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {legal_token}"})
+    assert claim_resp.status_code == 200
+
+    review_resp = await client.post(
+        f"/cases/{case_id}/review",
+        headers={"Authorization": f"Bearer {legal_token}"},
+        json={"action": "escalate", "notes": "no higher tier exists"},
+    )
+    assert review_resp.status_code == 403
 
 
 async def test_review_action_requires_assigned_reviewer(client, make_user):

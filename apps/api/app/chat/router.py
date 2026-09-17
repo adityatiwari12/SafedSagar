@@ -9,7 +9,7 @@ the graph actually retrieved.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, get_db, resolve_user_from_token
@@ -34,7 +34,6 @@ from app.db.models import (
     CaseStatus,
     Conversation,
     EscalationItem,
-    EscalationStatus,
     Message,
     MessageRole,
     User,
@@ -507,7 +506,7 @@ async def _process_chat_turn(
         )
     )
 
-    case = await _create_case(
+    await _create_case(
         db,
         current_user=current_user,
         conversation=conversation,
@@ -703,6 +702,7 @@ async def delete_conversation(
     if conversation is None or conversation.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
+    await db.execute(update(Case).where(Case.conversation_id == conversation_uuid).values(conversation_id=None))
     await db.execute(delete(EscalationItem).where(EscalationItem.conversation_id == conversation_uuid))
     await db.execute(delete(Message).where(Message.conversation_id == conversation_uuid))
     await db.delete(conversation)

@@ -10,7 +10,7 @@ def test_low_confidence_escalates_to_legal_queue_high_risk():
         ip_types=["trademark"], abs_tk_flags=None,
     )
     assert outcome.risk_level == CaseRiskLevel.high
-    assert outcome.status == CaseStatus.escalated
+    assert outcome.status == CaseStatus.open
     assert outcome.queue == CaseQueue.legal
 
 
@@ -61,6 +61,32 @@ def test_non_escalated_medium_confidence_is_medium_risk_resolved():
     assert outcome.queue is None
 
 
+def test_none_ip_types_does_not_raise_and_falls_back_to_no_signal():
+    """ip_types can be None (key present, value null) rather than an empty
+    list - must not raise, and should behave as if no ip_type signal was
+    present."""
+    outcome = derive_case_outcome(
+        escalate=True, confidence_level="medium", product_classification="cosmetic",
+        ip_types=None, abs_tk_flags=None,
+    )
+    assert outcome.risk_level == CaseRiskLevel.medium
+    assert outcome.status == CaseStatus.open
+    assert outcome.queue == CaseQueue.ip
+
+
+def test_non_dict_abs_tk_flags_does_not_raise_and_falls_back_to_no_signal():
+    """abs_tk_flags could theoretically be a non-dict truthy value - must
+    be treated the same as None (no signal) rather than raising
+    AttributeError on .get()."""
+    outcome = derive_case_outcome(
+        escalate=True, confidence_level="medium", product_classification="cosmetic",
+        ip_types=["trademark"], abs_tk_flags="not a dict",
+    )
+    assert outcome.risk_level == CaseRiskLevel.medium
+    assert outcome.status == CaseStatus.open
+    assert outcome.queue == CaseQueue.ip
+
+
 def test_medium_risk_alone_with_no_signal_routes_to_ip_queue():
     """spec Section 8's OR: medium risk alone (without high risk or a
     signal) does NOT route to legal — only high risk or a signal does."""
@@ -69,5 +95,5 @@ def test_medium_risk_alone_with_no_signal_routes_to_ip_queue():
         ip_types=["trademark"], abs_tk_flags=None,
     )
     assert outcome.risk_level == CaseRiskLevel.medium
-    assert outcome.status == CaseStatus.escalated
+    assert outcome.status == CaseStatus.open
     assert outcome.queue == CaseQueue.ip
