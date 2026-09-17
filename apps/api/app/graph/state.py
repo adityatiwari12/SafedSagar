@@ -43,6 +43,12 @@ class GraphState(TypedDict, total=False):
     validated_citations: list[Citation]
     rejected_citations: list[Citation]
     next_steps: list[str]
+    # Set by reason_and_cite when the question is too under-specified to
+    # answer precisely (e.g. "medicinal plants" with no plant/source/scale
+    # named) - one targeted question to ask instead of a generic answer.
+    # None once the user has already answered a clarifying round this turn
+    # (chat/router.py won't ask twice).
+    clarifying_question: str | None
 
     confidence_score: float  # 0.0-1.0
     confidence_level: str  # "high" | "medium" | "low"
@@ -63,6 +69,12 @@ PRODUCT_CATEGORIES = [
     "ayurveda_aahara_or_nutraceutical",
     "cosmetic",
     "unclear",
+    # Not a formulation-classification outcome at all - the question isn't
+    # about Ayurveda IP/biodiversity/regulatory matters in the first place
+    # (e.g. "what's the weather"). chat/router.py short-circuits on this
+    # before the "unclear" clarifying-question flow, which is only for
+    # on-topic-but-ambiguous questions.
+    "out_of_scope",
 ]
 
 # CLAUDE.md/PRD: the IP regimes an Ayurvedic product can touch.

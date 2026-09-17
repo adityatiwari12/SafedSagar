@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { chatApi, ChatTurnResponse } from '../api/chatApi'
+import { chatApi, ChatTurnResponse, JourneyStepId } from '../api/chatApi'
 import { conversationsApi } from '../api/conversationsApi'
 import { ApiError } from '../api/http'
 import { LanguageCode, isSupportedLanguage } from '../api/languages'
@@ -43,6 +43,10 @@ export function useChatSession() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [pendingClarifying, setPendingClarifying] = useState<string[] | null>(null)
+  // Real-time progress through the pipeline for the in-flight turn, driven
+  // by /chat/ws step frames - null once idle (JourneyStepper falls back to
+  // deriveJourneyStep for the last-finished/reopened state at that point).
+  const [liveStep, setLiveStep] = useState<JourneyStepId | null>(null)
   // Mirrors conversationIdRef.current, purely so the history sidebar can
   // reactively highlight the active conversation - runTurn/loadConversation
   // read the ref directly (no re-render dependency needed there).
@@ -59,14 +63,18 @@ export function useChatSession() {
     async (text: string, answers?: Record<string, string>, juris?: 'india' | 'international') => {
       setStatus('sending')
       setError(null)
+      setLiveStep('language')
       try {
-        const response = await chatApi.sendTurn({
-          conversationId: conversationIdRef.current,
-          text,
-          jurisdiction: juris ?? jurisdiction,
-          answers,
-          language,
-        })
+        const response = await chatApi.sendTurnStreaming(
+          {
+            conversationId: conversationIdRef.current,
+            text,
+            jurisdiction: juris ?? jurisdiction,
+            answers,
+            language,
+          },
+          setLiveStep,
+        )
         setConversationId(response.conversationId)
 
         if (response.clarifying_questions?.length) {
@@ -95,6 +103,8 @@ export function useChatSession() {
             : 'Network error. Your question was kept — try again.'
         setError(message)
         setStatus('error')
+      } finally {
+        setLiveStep(null)
       }
     },
     [jurisdiction, language],
@@ -205,6 +215,7 @@ export function useChatSession() {
     status,
     error,
     pendingClarifying,
+    liveStep,
     setLanguage,
     setJurisdiction,
     sendMessage,

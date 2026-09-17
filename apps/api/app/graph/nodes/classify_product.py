@@ -22,6 +22,10 @@ effectiveness
 - ayurveda_aahara_or_nutraceutical: a food, Ayurveda-Aahar, or nutraceutical
 - cosmetic: a cosmetic product
 - unclear: not enough information in the question to classify
+- out_of_scope: the question is NOT about an Ayurvedic product/formulation \
+or its IP, biodiversity/ABS, or regulatory status at all (e.g. general \
+chit-chat, coding help, weather, unrelated law/medicine). Use this, not \
+"unclear", when the topic itself is wrong rather than merely under-specified.
 
 QUESTION: {question}
 

@@ -8,6 +8,14 @@ export class ApiError extends Error {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
+// http(s)://host -> ws(s)://host, same base the REST calls above use -
+// keeps the WebSocket client (realChatApi.ts) from duplicating base-URL
+// resolution or getting out of sync with VITE_API_BASE_URL.
+export function apiWsUrl(path: string): string {
+  const base = API_BASE || window.location.origin
+  return `${base.replace(/^http/, 'ws')}${path}`
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},

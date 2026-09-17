@@ -42,11 +42,16 @@ export default function ChatPage() {
     return null
   }, [session.turns])
 
-  const activeStep = deriveJourneyStep({
-    hasUserMessage: session.turns.some((t) => t.role === 'user'),
-    pendingClarifying: Boolean(session.pendingClarifying?.length),
-    latest: latestAssistant,
-  })
+  // Live /chat/ws progress while a turn is in flight; once it settles,
+  // fall back to deriving from the last finished response (also covers
+  // conversations reopened from history, which have no live events).
+  const activeStep =
+    session.liveStep ??
+    deriveJourneyStep({
+      hasUserMessage: session.turns.some((t) => t.role === 'user'),
+      pendingClarifying: Boolean(session.pendingClarifying?.length),
+      latest: latestAssistant,
+    })
 
   const canSend =
     session.status !== 'sending' && Boolean(draft.trim()) && !session.pendingClarifying

@@ -1,4 +1,15 @@
-import { ChatApi, ChatTurnInput, ChatTurnResponse, Citation } from './chatApi'
+import { ChatApi, ChatTurnInput, ChatTurnResponse, Citation, JourneyStepId } from './chatApi'
+
+const MOCK_STEP_SEQUENCE: JourneyStepId[] = [
+  'language',
+  'understand',
+  'classify',
+  'jurisdiction',
+  'need',
+  'abs',
+  'answer',
+  'action',
+]
 
 let counter = 0
 function nextId(prefix: string): string {
@@ -166,6 +177,17 @@ export const mockChatApi: ChatApi = {
         'Escalate to a human facilitator if the matter is time-sensitive',
       ],
     })
+  },
+
+  // No real backend to stream from in mock mode - fires the same step
+  // sequence a live /chat/ws turn would, spaced out so JourneyStepper
+  // visibly animates in dev, then resolves with sendTurn's answer.
+  async sendTurnStreaming(input: ChatTurnInput, onStep: (step: JourneyStepId) => void): Promise<ChatTurnResponse> {
+    for (const step of MOCK_STEP_SEQUENCE) {
+      onStep(step)
+      await new Promise((resolve) => setTimeout(resolve, 120))
+    }
+    return mockChatApi.sendTurn(input)
   },
 
   async escalate(_conversationId: string) {

@@ -1,20 +1,17 @@
-import { ChatTurnResponse } from '../api/chatApi'
+import { ChatTurnResponse, JourneyStepId } from '../api/chatApi'
 
-export type JourneyStepId =
-  | 'language'
-  | 'jurisdiction'
-  | 'understand'
-  | 'classify'
-  | 'need'
-  | 'abs'
-  | 'answer'
-  | 'action'
+export type { JourneyStepId }
 
+// Order matches chat/router.py's NODE_TO_STEP / the graph's real node
+// execution order (condense_query -> classify_product -> route_jurisdiction
+// -> route_ip_type/retrieve/rerank -> reason_and_cite/validate_citations ->
+// score_confidence/escalate_if_needed), not an arbitrary UI-authored guess -
+// a live /chat/ws turn lights these up in exactly this left-to-right order.
 const STEPS: { id: JourneyStepId; label: string }[] = [
   { id: 'language', label: 'Language' },
-  { id: 'jurisdiction', label: 'Jurisdiction' },
   { id: 'understand', label: 'Understand' },
   { id: 'classify', label: 'Classify' },
+  { id: 'jurisdiction', label: 'Jurisdiction' },
   { id: 'need', label: 'Identify need' },
   { id: 'abs', label: 'ABS / TK' },
   { id: 'answer', label: 'Answer' },
@@ -27,13 +24,15 @@ export function deriveJourneyStep(opts: {
   latest?: ChatTurnResponse | null
 }): JourneyStepId {
   const { hasUserMessage, pendingClarifying, latest } = opts
-  // Sit on step 1 until a message is actually sent - jumping straight to
-  // "jurisdiction" before any interaction made both toggle steps look
-  // pre-completed on page load, which reads as "skipped a step".
+  // Fallback for turns with no live step events to replay (reopening a
+  // past conversation from history, or a turn sent before this session
+  // saw any WebSocket frames) - best-effort guess from the finished
+  // response alone, same as before live streaming existed.
   if (!hasUserMessage) return 'language'
   if (pendingClarifying) return 'understand'
   if (!latest || !latest.answer) return 'understand'
   if (latest.classification.product_type === 'unknown') return 'classify'
+  if (latest.classification.product_type === 'out_of_scope') return 'classify'
   if (latest.abs_tk_flags && (latest.abs_tk_flags.biological_resource_likely || latest.abs_tk_flags.traditional_knowledge_likely)) {
     if (!latest.next_steps?.length) return 'abs'
   }

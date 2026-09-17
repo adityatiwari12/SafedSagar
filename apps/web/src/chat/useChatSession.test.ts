@@ -4,7 +4,7 @@ import { useChatSession } from './useChatSession'
 import { chatApi } from '../api/chatApi'
 
 vi.mock('../api/chatApi', () => ({
-  chatApi: { sendTurn: vi.fn(), escalate: vi.fn() },
+  chatApi: { sendTurn: vi.fn(), sendTurnStreaming: vi.fn(), escalate: vi.fn() },
 }))
 
 beforeEach(() => {
@@ -12,7 +12,7 @@ beforeEach(() => {
 })
 
 test('sendMessage appends a user turn then an assistant turn on success', async () => {
-  ;(chatApi.sendTurn as ReturnType<typeof vi.fn>).mockResolvedValue({
+  ;(chatApi.sendTurnStreaming as ReturnType<typeof vi.fn>).mockResolvedValue({
     conversationId: 'conv-1',
     classification: { product_type: 'ayurvedic_formulation', ip_type: 'patent' },
     jurisdiction: 'india',
@@ -39,7 +39,7 @@ test('sendMessage appends a user turn then an assistant turn on success', async 
 })
 
 test('surfaces clarifying questions without a final answer-only flow', async () => {
-  ;(chatApi.sendTurn as ReturnType<typeof vi.fn>).mockResolvedValue({
+  ;(chatApi.sendTurnStreaming as ReturnType<typeof vi.fn>).mockResolvedValue({
     conversationId: 'conv-1',
     clarifying_questions: ['What formulation form (tablet, oil, powder)?'],
     classification: { product_type: 'unknown', ip_type: 'unknown' },
@@ -63,7 +63,7 @@ test('surfaces clarifying questions without a final answer-only flow', async () 
 })
 
 test('changing jurisdiction re-sends the last user turn with the new jurisdiction', async () => {
-  ;(chatApi.sendTurn as ReturnType<typeof vi.fn>).mockResolvedValue({
+  ;(chatApi.sendTurnStreaming as ReturnType<typeof vi.fn>).mockResolvedValue({
     conversationId: 'conv-1',
     classification: { product_type: 'ayurvedic_formulation', ip_type: 'patent' },
     jurisdiction: 'india',
@@ -84,8 +84,9 @@ test('changing jurisdiction re-sends the last user turn with the new jurisdictio
   })
 
   await waitFor(() =>
-    expect(chatApi.sendTurn).toHaveBeenCalledWith(
+    expect(chatApi.sendTurnStreaming).toHaveBeenCalledWith(
       expect.objectContaining({ jurisdiction: 'international' }),
+      expect.any(Function),
     ),
   )
 })

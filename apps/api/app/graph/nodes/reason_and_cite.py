@@ -23,12 +23,24 @@ Use ONLY the numbered source chunks below. Do not cite or invent \
 authority from any other jurisdiction.
 {history_section}
 
-If the question is shaped as a yes/no question (can I patent X, is X \
-allowed, do I need to register, etc.), your FIRST sentence MUST be a \
-direct verdict - "Yes,", "No,", "Likely not,", or "Uncertain," - before \
-any procedure or next steps. Do not bury the verdict inside a wall of \
-procedural detail; a user who asks "can I patent this" wants to know if \
-they can, not just how filing works.
+If, and ONLY if, the question is phrased as a yes/no question ("can I \
+patent X", "is X allowed", "do I need to register", "must I..."), your \
+FIRST sentence MUST be a direct verdict before any procedure or next \
+steps - pick the ONE opener that actually fits: "Yes,", "No,", "Likely \
+not,", "Uncertain," or, when the real answer is conditional, "Yes, but \
+only if...," / "Generally yes, subject to...,". Never write a verdict \
+that contradicts itself (e.g. "Yes, ... No, ..." in the same answer) - \
+if the honest answer is conditional, say so as ONE conditional sentence, \
+don't tack on a second, opposite verdict afterward. A user who asks "can \
+I patent this" wants to know if they can, not just how filing works. A \
+question asking WHAT rules/obligations apply, or HOW something works, is \
+NOT a yes/no question - do not force a Yes/No/Likely-not opener onto it.
+
+Regardless of question shape, "answer" must always be a real, substantive \
+explanation, never just a bare verdict word or a one-sentence stub. State \
+the applicable rule(s) and how they apply to the facts given, with \
+citations - a verdict opener (when one applies) is the first sentence of \
+that explanation, not the whole answer.
 
 Apply the retrieved rules to the SPECIFIC facts in the question, even if \
 the chunks don't name the exact product. E.g. if a chunk excludes \
@@ -71,6 +83,26 @@ steps for the user, grounded only in what the cited chunks actually say \
 (e.g. "File Form I with the National Biodiversity Authority before \
 commercial use" - not generic advice like "consult a lawyer" unless the \
 chunks give nothing more specific).
+- "clarifying_question": a single specific question, or null. Set this \
+ONLY when the question is genuinely too under-specified to give a \
+precise answer - it names a broad category instead of a specific thing \
+(e.g. "Indian medicinal plants" instead of naming one; "my formulation" \
+with no ingredients given) AND the missing detail would actually change \
+which rule/obligation applies. This includes patentability questions \
+that turn on whether there is a genuine inventive step: Section 3(p) \
+(or an equivalent exclusion chunk) bars traditional knowledge "as such", \
+NOT a real inventive advance built on top of it - if the user says they \
+"developed"/"invented" a formulation using a known herb/classical \
+ingredient but names no actual novelty (no specific new ratio, \
+combination, extraction/delivery method, dosage form, or measured \
+effect not already in the classical/traditional record), that missing \
+detail is exactly what decides patentable-vs-excluded - ask what's \
+novel about it rather than assuming either way. Do NOT set it just \
+because the topic is complex, or to avoid committing to a verdict - if \
+you can give a correct general answer that covers the reasonable cases, \
+do that instead and leave this null. Still fill "answer" with your best \
+general answer even when you also set this - it's shown only if the \
+graph decides to ask instead of answer.
 
 Return ONLY the JSON object, nothing else.
 """
@@ -79,6 +111,46 @@ Return ONLY the JSON object, nothing else.
 # Matches [1], [1,2], [1, 5] - the model sometimes groups multiple
 # indices in one bracket rather than writing [1][5] separately.
 _BRACKET_CITATION_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+
+# Deterministic backstop for the "claims novelty, names none" pattern the
+# prompt's clarifying_question guidance above asks the model to catch -
+# verified live (2026-09-17): llama3.2 (3B, CPU) missed it on 3/3 identical
+# runs of "I developed a new Ayurvedic formulation using Ashwagandha. Can I
+# patent it?", giving a confident "No, it's traditional knowledge" without
+# ever asking what's actually novel about the formulation. Prompt wording
+# alone isn't reliable for this multi-condition judgment on a small local
+# model, so this is checked in code instead: a keyword heuristic, not a
+# real understanding of the question - it can miss phrasings or, more
+# rarely, fire when the user already gave enough detail. Only overrides a
+# null clarifying_question (never replaces one the model already asked),
+# and only when the model's own answer already leans on a TK exclusion -
+# i.e. exactly the case where "what's novel about it" would change the
+# verdict, not every patent question about a known herb.
+_NOVELTY_CLAIM_RE = re.compile(r"\b(developed|invented|created|formulated)\b", re.IGNORECASE)
+_NOVELTY_DETAIL_RE = re.compile(
+    r"\b(\d+(\.\d+)?\s*%|\d+\s*mg|extract|combination of|ratio|dosage|capsule|tablet|synerg\w*)\b",
+    re.IGNORECASE,
+)
+_TK_EXCLUSION_ANSWER_RE = re.compile(
+    r"traditional knowledge|\bas such\b|3\(p\)|not patentable|excluded", re.IGNORECASE
+)
+
+
+def _needs_novelty_clarification(question: str, answer: str) -> bool:
+    return bool(
+        _NOVELTY_CLAIM_RE.search(question)
+        and not _NOVELTY_DETAIL_RE.search(question)
+        and _TK_EXCLUSION_ANSWER_RE.search(answer)
+    )
+
+
+_NOVELTY_CLARIFYING_QUESTION = (
+    "What specifically is novel about your formulation compared to the known/classical "
+    "use - a new ingredient combination or ratio, extraction/processing method, dosage "
+    "form, or a documented effect not found in classical texts? This determines whether "
+    "it's excluded as traditional knowledge \"as such\" or may qualify as a genuine "
+    "inventive step."
+)
 
 
 def _extract_bracket_citations(texts: list[str], chunks: list[dict]) -> list[Citation]:
@@ -146,6 +218,7 @@ def reason_and_cite(state: GraphState) -> dict:
             "raw_citations": [],
             "next_steps": ["Rephrase the question with more product/context detail",
                             "Escalate to a human IP facilitator"],
+            "clarifying_question": None,
         }
 
     prompt = _PROMPT_TEMPLATE.format(
@@ -192,15 +265,39 @@ def reason_and_cite(state: GraphState) -> dict:
     # but the caller had no signal to distinguish it from a real (if thin)
     # answer, so the user just saw an empty response. Retried the same as
     # a parse failure instead of accepted as-is.
+    #
+    # A non-blank but bare-verdict answer (e.g. "No, [7]") is the same
+    # failure mode again, just non-empty - verified live (2026-09-17): the
+    # prompt instructs the model to always explain, not just verdict, but
+    # llama3.2 (3B, CPU) doesn't reliably follow that on every sample; the
+    # identical question re-asked a minute later produced a full, correctly
+    # cited paragraph. Word-count is a crude substantiveness check but a
+    # real explanation with citations clears it easily, while a bare
+    # verdict doesn't - so treat "too short" the same as "blank": worth one
+    # retry. Keeps a non-substantive candidate as a fallback (never worse
+    # than before this change) rather than discarding it outright, in case
+    # both attempts come back short.
+    # 3 attempts, not 2 - verified live (2026-09-17): a bare-verdict answer
+    # can recur on back-to-back samples of the same question, so 2 tries
+    # isn't always enough headroom to land a substantive one.
+    MIN_SUBSTANTIVE_WORDS = 8
     result = None
-    for _attempt in range(2):
+    fallback = None
+    for _attempt in range(3):
         try:
             candidate = _generate()
-            if candidate.get("answer", "").strip():
+            answer_text = candidate.get("answer", "").strip()
+            if not answer_text:
+                continue
+            if len(answer_text.split()) >= MIN_SUBSTANTIVE_WORDS:
                 result = candidate
                 break
+            fallback = fallback or candidate
         except (json.JSONDecodeError, KeyError, RuntimeError, ValueError):
             continue
+
+    if result is None:
+        result = fallback
 
     if result is None:
         return {
@@ -209,10 +306,22 @@ def reason_and_cite(state: GraphState) -> dict:
             "human IP facilitator.",
             "raw_citations": [],
             "next_steps": ["Rephrase the question", "Escalate to a human IP facilitator"],
+            "clarifying_question": None,
         }
 
     answer = result.get("answer", "")
     next_steps = [s for s in result.get("next_steps", []) if isinstance(s, str) and s.strip()]
     raw_citations = _extract_bracket_citations([answer, *next_steps], chunks)
+    clarifying_question = result.get("clarifying_question")
+    if not isinstance(clarifying_question, str) or not clarifying_question.strip():
+        clarifying_question = None
 
-    return {"answer": answer, "raw_citations": raw_citations, "next_steps": next_steps}
+    if clarifying_question is None and _needs_novelty_clarification(question, answer):
+        clarifying_question = _NOVELTY_CLARIFYING_QUESTION
+
+    return {
+        "answer": answer,
+        "raw_citations": raw_citations,
+        "next_steps": next_steps,
+        "clarifying_question": clarifying_question,
+    }

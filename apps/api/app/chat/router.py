@@ -8,11 +8,11 @@ the graph actually retrieved.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user, get_db
+from app.auth.dependencies import get_current_user, get_db, resolve_user_from_token
 from app.chat.schemas import (
     AbsTkFlagsOut,
     ChatTurnRequest,
@@ -24,6 +24,7 @@ from app.chat.schemas import (
     EscalateRequest,
     EscalateResponse,
 )
+from app.db.base import AsyncSessionLocal
 from app.db.models import (
     Conversation,
     EscalationItem,
@@ -32,12 +33,32 @@ from app.db.models import (
     MessageRole,
     User,
 )
-from app.graph.graph import run_classification, run_graph, run_remaining
+from app.graph.graph import NodeDoneCallback, run_classification, run_graph, run_remaining
 from app.graph.state import GraphState
 from app.translation.languages import DEFAULT_LANGUAGE, is_supported
 from app.translation.translation_service import get_translation_service
 
 router = APIRouter(tags=["chat"])
+
+# Maps a graph node's function name (or the "language" pseudo-step emitted
+# before the graph even runs, once translation-detection resolves the
+# target language) to the JourneyStepper step it represents in the web UI.
+# Several nodes collapse onto the same UI step (e.g. retrieve+rerank are
+# both "need") - the WebSocket handler dedupes so each step frame is sent
+# once per turn regardless of how many nodes map onto it.
+NODE_TO_STEP = {
+    "language": "language",
+    "condense_query": "understand",
+    "classify_product": "classify",
+    "route_jurisdiction": "jurisdiction",
+    "route_ip_type": "need",
+    "retrieve": "need",
+    "rerank": "need",
+    "reason_and_cite": "answer",
+    "validate_citations": "answer",
+    "score_confidence": "action",
+    "escalate_if_needed": "action",
+}
 
 _VALID_JURISDICTIONS = {"india", "international"}
 
@@ -51,6 +72,17 @@ CLARIFYING_QUESTIONS = [
     "Is the intended use primarily as a drug/medicine, food (Ayurveda Aahara), or cosmetic?",
     "What do you mainly need help with - patent, trademark, GI, ABS/biodiversity, or regulatory compliance?",
 ]
+
+_OUT_OF_SCOPE_MESSAGE = (
+    "This assistant only covers Ayurveda intellectual-property, biodiversity/ABS, and "
+    "regulatory questions. Please ask something in that scope, or rephrase your question "
+    "to connect it to an Ayurvedic product, formulation, or filing."
+)
+
+
+async def _maybe_await(value):
+    if hasattr(value, "__await__"):
+        await value
 
 
 async def _get_or_create_conversation(
@@ -181,12 +213,18 @@ def _abs_tk_flags(state: GraphState) -> AbsTkFlagsOut | None:
     )
 
 
-@router.post("/chat", response_model=ChatTurnResponse)
-async def chat(
+async def _process_chat_turn(
     payload: ChatTurnRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: User,
+    db: AsyncSession,
+    on_node_done: NodeDoneCallback | None = None,
 ) -> ChatTurnResponse:
+    """Core /chat business logic, shared by the REST endpoint (below) and
+    the /chat/ws WebSocket endpoint. on_node_done is None for REST callers
+    (no behavior change); the WebSocket endpoint passes a callback that
+    streams {"type": "step", "step": ...} frames to the browser as the
+    graph actually progresses, via NODE_TO_STEP above.
+    """
     jurisdiction = payload.jurisdiction if payload.jurisdiction in _VALID_JURISDICTIONS else None
     conversation = await _get_or_create_conversation(db, current_user, payload.conversationId)
 
@@ -213,6 +251,9 @@ async def chat(
     )
     conversation.language = target_language
     canonical_text = incoming.canonical_query
+
+    if on_node_done is not None:
+        await _maybe_await(on_node_done("language", {}))
 
     # Must run BEFORE adding this turn's Message below - autoflush would
     # otherwise flush that pending insert first and the "prior messages"
@@ -246,7 +287,45 @@ async def chat(
         # (including the slow reason_and_cite LLM call) just to check
         # product_classification, discarding a real answer whenever it came
         # back "unclear".
-        classify_state = await run_classification(canonical_text, jurisdiction, None, history_text=history_text)
+        classify_state = await run_classification(
+            canonical_text, jurisdiction, None, history_text=history_text, on_node_done=on_node_done
+        )
+        if classify_state.get("product_classification") == "out_of_scope":
+            # Not "unclear" (ambiguous but on-topic) - the question isn't
+            # about Ayurveda IP/biodiversity/regulatory matters at all.
+            # Refuse immediately rather than asking clarifying questions or
+            # running jurisdiction/retrieval/reasoning on it.
+            localized_refusal, refusal_status, refusal_review = _localize_list(
+                translation_service, [_OUT_OF_SCOPE_MESSAGE], target_language
+            )
+            response = ChatTurnResponse(
+                conversationId=str(conversation.id),
+                classification=ClassificationOut(product_type="out_of_scope", ip_type="out_of_scope"),
+                jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
+                answer=localized_refusal[0],
+                citations=[],
+                confidence=0.0,
+                confidence_band="low",
+                escalate_recommended=False,
+                detected_language=incoming.detected_language,
+                canonical_query=canonical_text,
+                canonical_answer=_OUT_OF_SCOPE_MESSAGE,
+                translation_status=refusal_status,
+                needs_human_review=refusal_review,
+                timing_ms=classify_state.get("node_timings"),
+            )
+            db.add(
+                Message(
+                    conversation_id=conversation.id,
+                    role=MessageRole.assistant,
+                    content=_OUT_OF_SCOPE_MESSAGE,
+                    display_text=localized_refusal[0],
+                    response_json=response.model_dump(),
+                    language=target_language,
+                )
+            )
+            await db.commit()
+            return response
         if classify_state.get("product_classification") == "unclear":
             localized_questions, cq_status, cq_review = _localize_list(
                 translation_service, CLARIFYING_QUESTIONS, target_language
@@ -280,9 +359,54 @@ async def chat(
             )
             await db.commit()
             return response
-        state = await run_remaining(classify_state)
+        state = await run_remaining(classify_state, on_node_done=on_node_done)
     else:
-        state = await run_graph(canonical_text, jurisdiction, None, history_text=history_text)
+        state = await run_graph(
+            canonical_text, jurisdiction, None, history_text=history_text, on_node_done=on_node_done
+        )
+
+    # Second (and last - one round max, same as the product-classification
+    # gate above) chance to ask instead of guess: reason_and_cite flags this
+    # when the question is real but too under-specified to answer precisely
+    # (e.g. "Indian medicinal plants" naming no plant), rather than always
+    # forcing out a generic best-effort answer.
+    dynamic_clarifying_question = state.get("clarifying_question") if not is_clarification_answer else None
+    if dynamic_clarifying_question:
+        localized_questions, cq_status, cq_review = _localize_list(
+            translation_service, [dynamic_clarifying_question], target_language
+        )
+        response = ChatTurnResponse(
+            conversationId=str(conversation.id),
+            clarifying_questions=localized_questions,
+            classification=ClassificationOut(
+                product_type=state.get("product_classification", "unclear"),
+                ip_type=", ".join(state.get("ip_types", [])) or "unknown",
+            ),
+            jurisdiction=state.get("jurisdiction") or payload.jurisdiction,
+            answer="",
+            citations=[],
+            confidence=state.get("confidence_score", 0.0),
+            confidence_band="low",
+            escalate_recommended=False,
+            detected_language=incoming.detected_language,
+            canonical_query=canonical_text,
+            canonical_answer=None,
+            translation_status=cq_status,
+            needs_human_review=cq_review,
+            timing_ms=state.get("node_timings"),
+        )
+        db.add(
+            Message(
+                conversation_id=conversation.id,
+                role=MessageRole.assistant,
+                content=dynamic_clarifying_question,
+                display_text=localized_questions[0],
+                response_json=response.model_dump(),
+                language=target_language,
+            )
+        )
+        await db.commit()
+        return response
 
     canonical_answer = state.get("answer", "")
     outgoing = translation_service.resolve_outgoing(canonical_answer, target_language)
@@ -336,6 +460,66 @@ async def chat(
 
     await db.commit()
     return response
+
+
+@router.post("/chat", response_model=ChatTurnResponse)
+async def chat(
+    payload: ChatTurnRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ChatTurnResponse:
+    return await _process_chat_turn(payload, current_user, db)
+
+
+@router.websocket("/chat/ws")
+async def chat_ws(websocket: WebSocket, token: str = Query(...)) -> None:
+    """Same /chat contract as the REST endpoint, but streams a
+    {"type": "step", "step": <JourneyStepId>} frame as each graph node
+    actually completes, then one final {"type": "result", "data": <same
+    ChatTurnResponse shape as POST /chat>} frame before closing. Lets the
+    web UI's stepper reflect real progress instead of guessing from the
+    finished response (see NODE_TO_STEP above for the node->step mapping).
+
+    Auth is a query param, not the Authorization header the REST endpoint
+    uses - browsers can't set custom headers on a WebSocket handshake.
+    Uses its own DB session (FastAPI's Depends(get_db) doesn't apply to
+    WebSocket routes) and closes it when the connection ends.
+    """
+    async with AsyncSessionLocal() as db:
+        try:
+            current_user = await resolve_user_from_token(token, db)
+        except HTTPException:
+            await websocket.close(code=4401, reason="Could not validate credentials")
+            return
+
+        await websocket.accept()
+        sent_steps: set[str] = set()
+
+        async def on_node_done(node_name: str, _state: GraphState) -> None:
+            step = NODE_TO_STEP.get(node_name)
+            if step and step not in sent_steps:
+                sent_steps.add(step)
+                await websocket.send_json({"type": "step", "step": step})
+            # "abs" has no dedicated graph node - the ABS/TK check is a
+            # derived flag (_abs_tk_flags), ready as soon as rerank has run
+            # (ip_types from route_ip_type, reranked_chunks from rerank).
+            if node_name == "rerank" and "abs" not in sent_steps:
+                sent_steps.add("abs")
+                await websocket.send_json({"type": "step", "step": "abs"})
+
+        try:
+            while True:
+                raw = await websocket.receive_json()
+                payload = ChatTurnRequest.model_validate(raw)
+                sent_steps.clear()
+                try:
+                    response = await _process_chat_turn(payload, current_user, db, on_node_done=on_node_done)
+                except Exception as exc:  # noqa: BLE001 - report to the client, don't crash the socket
+                    await websocket.send_json({"type": "error", "message": str(exc)})
+                    continue
+                await websocket.send_json({"type": "result", "data": response.model_dump()})
+        except WebSocketDisconnect:
+            pass
 
 
 @router.post("/escalations", response_model=EscalateResponse)

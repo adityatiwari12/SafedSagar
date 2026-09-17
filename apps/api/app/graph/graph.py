@@ -53,7 +53,14 @@ REMAINING_NODES: list[Node] = [
 NODES: list[Node] = CLASSIFY_NODES + REMAINING_NODES
 
 
-async def _run_nodes(nodes: list[Node], state: GraphState) -> GraphState:
+NodeDoneCallback = Callable[[str, GraphState], Awaitable[None] | None]
+
+
+async def _run_nodes(
+    nodes: list[Node],
+    state: GraphState,
+    on_node_done: NodeDoneCallback | None = None,
+) -> GraphState:
     # Per-node wall time, surfaced to the API response (ChatTurnResponse.
     # timing_ms) so latency regressions - e.g. reason_and_cite's LLM call
     # dominating end-to-end time - are visible per-request instead of only
@@ -68,6 +75,14 @@ async def _run_nodes(nodes: list[Node], state: GraphState) -> GraphState:
             result = await result
         state.update(result)
         timings[node.__name__] = round((time.perf_counter() - start) * 1000, 1)
+        # Optional hook fired after each node completes - lets a caller
+        # (chat/router.py's WebSocket endpoint) push live step-progress
+        # frames to the browser as the graph runs, without REST callers
+        # paying any cost (on_node_done is None for them).
+        if on_node_done is not None:
+            callback_result = on_node_done(node.__name__, state)
+            if inspect.isawaitable(callback_result):
+                await callback_result
     return state
 
 
@@ -91,19 +106,20 @@ async def run_classification(
     doc_type: str | None = None,
     *,
     history_text: str | None = None,
+    on_node_done: NodeDoneCallback | None = None,
 ) -> GraphState:
     """Run only condense_query + classify_product - enough to decide
     whether to ask a clarifying question, without running retrieval or
     the LLM reasoning call. Pass the result to run_remaining to continue
     the same turn without recomputing these nodes."""
     state = _initial_state(question, jurisdiction, doc_type, history_text)
-    return await _run_nodes(CLASSIFY_NODES, state)
+    return await _run_nodes(CLASSIFY_NODES, state, on_node_done)
 
 
-async def run_remaining(state: GraphState) -> GraphState:
+async def run_remaining(state: GraphState, *, on_node_done: NodeDoneCallback | None = None) -> GraphState:
     """Continue a state already produced by run_classification through
     the rest of the graph."""
-    return await _run_nodes(REMAINING_NODES, state)
+    return await _run_nodes(REMAINING_NODES, state, on_node_done)
 
 
 async def run_graph(
@@ -112,7 +128,10 @@ async def run_graph(
     doc_type: str | None = None,
     *,
     history_text: str | None = None,
+    on_node_done: NodeDoneCallback | None = None,
 ) -> GraphState:
     """Run the full node sequence and return the final state."""
-    state = await run_classification(question, jurisdiction, doc_type, history_text=history_text)
-    return await run_remaining(state)
+    state = await run_classification(
+        question, jurisdiction, doc_type, history_text=history_text, on_node_done=on_node_done
+    )
+    return await run_remaining(state, on_node_done=on_node_done)

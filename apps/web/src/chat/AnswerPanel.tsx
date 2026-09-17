@@ -61,7 +61,7 @@ export function AnswerPanel({ response }: { response: ChatTurnResponse }) {
         )}
       </div>
 
-      {response.confidence_band === 'low' && (
+      {response.confidence_band === 'low' && response.classification.product_type !== 'out_of_scope' && (
         <p className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900" role="status">
           Low confidence — this answer may be incomplete. Prefer rephrasing your question or
           escalating to a human IP facilitator rather than relying on this alone.
