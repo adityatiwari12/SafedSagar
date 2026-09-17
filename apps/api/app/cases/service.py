@@ -11,10 +11,10 @@ from dataclasses import dataclass
 
 from app.db.models import CaseQueue, CaseRiskLevel, CaseStatus
 
-# spec Section 8: case.queue = legal only reachable when risk_level==high
-# AND an ambiguous/complex/ABS-sensitive/sensitive-TK signal is present -
-# never just because a case is high-risk for an ordinary reason (e.g. low
-# confidence on a routine trademark question stays in the ip queue).
+# spec Section 8: case.queue = legal is only reachable when risk_level==high
+# OR an explicit ambiguous/complex/ABS-sensitive/sensitive-TK signal is
+# present. Either high risk alone, or an ambiguous/sensitive signal alone,
+# is sufficient to route to legal queue.
 _LEGAL_TRIGGER_IP_TYPES = frozenset({"access_and_benefit_sharing"})
 
 
@@ -47,7 +47,7 @@ def derive_case_outcome(
             and (abs_tk_flags.get("biological_resource_likely") or abs_tk_flags.get("traditional_knowledge_likely"))
         )
     )
-    if is_ambiguous_or_sensitive:
+    if risk == CaseRiskLevel.high or is_ambiguous_or_sensitive:
         queue = CaseQueue.legal
     elif "drug_regulatory" in ip_types:
         queue = CaseQueue.regulatory

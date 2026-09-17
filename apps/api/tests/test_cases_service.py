@@ -2,20 +2,21 @@ from app.cases.service import derive_case_outcome
 from app.db.models import CaseQueue, CaseRiskLevel, CaseStatus
 
 
-def test_low_confidence_escalates_to_ip_queue_high_risk():
+def test_low_confidence_escalates_to_legal_queue_high_risk():
+    """spec Section 8's OR: risk_level==high is independently sufficient for
+    legal queue, even with no explicit ambiguous/sensitive signal."""
     outcome = derive_case_outcome(
         escalate=True, confidence_level="low", product_classification="cosmetic",
         ip_types=["trademark"], abs_tk_flags=None,
     )
     assert outcome.risk_level == CaseRiskLevel.high
     assert outcome.status == CaseStatus.escalated
-    assert outcome.queue == CaseQueue.ip
+    assert outcome.queue == CaseQueue.legal
 
 
 def test_unclear_classification_routes_to_legal_queue():
-    """spec Section 8: legal queue only reachable when risk_level==high AND
-    an ambiguous/ABS-sensitive/sensitive-TK signal is present - unclear
-    classification is the ambiguous-signal case."""
+    """spec Section 8's OR: an ambiguous/ABS-sensitive/sensitive-TK signal
+    is independently sufficient for legal queue, regardless of risk level."""
     outcome = derive_case_outcome(
         escalate=True, confidence_level="low", product_classification="unclear",
         ip_types=[], abs_tk_flags=None,
@@ -58,3 +59,15 @@ def test_non_escalated_medium_confidence_is_medium_risk_resolved():
     assert outcome.risk_level == CaseRiskLevel.medium
     assert outcome.status == CaseStatus.resolved
     assert outcome.queue is None
+
+
+def test_medium_risk_alone_with_no_signal_routes_to_ip_queue():
+    """spec Section 8's OR: medium risk alone (without high risk or a
+    signal) does NOT route to legal — only high risk or a signal does."""
+    outcome = derive_case_outcome(
+        escalate=True, confidence_level="medium", product_classification="cosmetic",
+        ip_types=["trademark"], abs_tk_flags=None,
+    )
+    assert outcome.risk_level == CaseRiskLevel.medium
+    assert outcome.status == CaseStatus.escalated
+    assert outcome.queue == CaseQueue.ip
