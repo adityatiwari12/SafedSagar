@@ -14,11 +14,27 @@ import uuid
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 from app.auth.security import create_access_token, hash_password
 from app.db.base import AsyncSessionLocal
-from app.db.models import User, UserRole
+from app.db.models import Role, User, UserRole, UserRoleAssignment
 from app.main import app
+
+# The legacy `users.role` column (still NOT NULL - see UserRole's
+# docstring for the deprecation/migration-window context) has no slot for
+# the 3 new-only role names. Since nothing in app.authz reads this column
+# any more, any legacy value is fine for those three - `user` is the
+# least-surprising placeholder.
+_LEGACY_ROLE_FALLBACK: dict[str, UserRole] = {
+    "user": UserRole.user,
+    "facilitator": UserRole.facilitator,
+    "regulatory_expert": UserRole.regulatory_expert,
+    "legal_expert": UserRole.user,
+    "institutional_admin": UserRole.admin,
+    "ministry_admin": UserRole.admin,
+    "kb_manager": UserRole.admin,
+}
 
 
 @pytest.fixture(scope="session")
@@ -42,15 +58,32 @@ async def make_user():
     /auth/register, which always forces role=user) and return
     (email, password, token).
 
-    Facilitator/Admin accounts have no self-registration path per the RBAC
-    spec, so tests that need one create it directly against the DB, the
-    same way a real Admin would seed one.
+    `role` is one of the new role-catalog names (app.authz.constants.
+    RoleName) as a plain string, e.g. "facilitator", "ministry_admin" -
+    this creates the real `UserRoleAssignment` row app.authz.service
+    reads (the legacy `users.role` column is also set, best-effort, only
+    because it's still NOT NULL - nothing in the new authz path reads it).
+    Facilitator/Admin-tier accounts have no self-registration path per the
+    RBAC spec, so tests that need one create it directly against the DB,
+    the same way a real Admin would seed one.
     """
-    async def _make(role: UserRole = UserRole.user, password: str = "test-password-123"):
+    async def _make(
+        role: str = "user",
+        organization_id: uuid.UUID | None = None,
+        password: str = "test-password-123",
+    ):
         email = f"{uuid.uuid4()}@example.test"
+        legacy_role = _LEGACY_ROLE_FALLBACK[role]
         async with AsyncSessionLocal() as session:
-            user = User(email=email, hashed_password=hash_password(password), role=role)
+            user = User(email=email, hashed_password=hash_password(password), role=legacy_role)
             session.add(user)
+            await session.flush()
+
+            role_row = await session.scalar(select(Role).where(Role.name == role))
+            assert role_row is not None, f"role {role!r} not seeded - run app.authz.seed"
+            session.add(
+                UserRoleAssignment(user_id=user.id, role_id=role_row.id, organization_id=organization_id)
+            )
             await session.commit()
             await session.refresh(user)
             user_id, user_role = user.id, user.role

@@ -13,13 +13,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_db, require_role
+from app.auth.dependencies import get_db
+from app.authz.constants import Permission
+from app.authz.service import AuthzContext, require_permission
 from app.cases.schemas import CaseOut, CloseCaseRequest
 from app.db.models import Conversation, EscalationItem, EscalationStatus, Message, MessageRole, User
 
 router = APIRouter(prefix="/cases", tags=["cases"])
-
-CASE_ROLES = ("facilitator", "regulatory_expert", "admin")
 
 
 async def _to_case_out(db: AsyncSession, item: EscalationItem) -> CaseOut:
@@ -59,7 +59,7 @@ async def _to_case_out(db: AsyncSession, item: EscalationItem) -> CaseOut:
 @router.get("", response_model=list[CaseOut])
 async def list_cases(
     status_filter: str | None = None,
-    _current_user: User = Depends(require_role(*CASE_ROLES)),
+    _ctx: AuthzContext = Depends(require_permission(Permission.CASE_VIEW_QUEUE)),
     db: AsyncSession = Depends(get_db),
 ) -> list[CaseOut]:
     stmt = select(EscalationItem).order_by(EscalationItem.created_at.desc())
@@ -76,14 +76,14 @@ async def list_cases(
 @router.post("/{case_id}/claim", response_model=CaseOut)
 async def claim_case(
     case_id: uuid.UUID,
-    current_user: User = Depends(require_role(*CASE_ROLES)),
+    ctx: AuthzContext = Depends(require_permission(Permission.CASE_ASSIGN)),
     db: AsyncSession = Depends(get_db),
 ) -> CaseOut:
     item = await db.get(EscalationItem, case_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
 
-    item.assigned_facilitator_id = current_user.id
+    item.assigned_facilitator_id = ctx.user.id
     item.status = EscalationStatus.in_progress
     await db.commit()
     await db.refresh(item)
@@ -94,7 +94,7 @@ async def claim_case(
 async def close_case(
     case_id: uuid.UUID,
     payload: CloseCaseRequest,
-    _current_user: User = Depends(require_role(*CASE_ROLES)),
+    _ctx: AuthzContext = Depends(require_permission(Permission.CASE_CLOSE)),
     db: AsyncSession = Depends(get_db),
 ) -> CaseOut:
     item = await db.get(EscalationItem, case_id)

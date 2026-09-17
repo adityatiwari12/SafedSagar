@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user, get_db
 from app.auth.schemas import Token, UserCreate, UserOut
 from app.auth.security import create_access_token, hash_password, verify_password
-from app.db.models import User, UserRole, VerificationStatus
+from app.db.models import Role, User, UserRole, UserRoleAssignment, VerificationStatus
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,7 +45,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
     )
     db.add(user)
     try:
-        await db.commit()
+        await db.flush()
     except IntegrityError as exc:
         # The pre-check above has a race window between two concurrent
         # registrations for the same email; the unique constraint is the
@@ -55,6 +55,23 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> U
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         ) from exc
+
+    # New authorization source of truth is user_roles, not the legacy
+    # `role` column above (kept only for the migration window - see
+    # app.db.models.UserRole's docstring). Every registration must also
+    # land a UserRoleAssignment row, or the account would have zero
+    # permissions under app.authz.service despite `role` looking set.
+    role_row = await db.scalar(select(Role).where(Role.name == role.value))
+    if role_row is None:
+        # Seed data (app.authz.seed) not applied - fail loudly rather than
+        # silently create a permissionless account.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Role catalog not seeded - contact an administrator.",
+        )
+    db.add(UserRoleAssignment(user_id=user.id, role_id=role_row.id, organization_id=None))
+    await db.commit()
     await db.refresh(user)
     return user
 

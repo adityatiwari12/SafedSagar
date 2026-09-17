@@ -1,7 +1,7 @@
 """FastAPI dependencies for DB sessions, current-user resolution, and RBAC."""
 
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -21,11 +21,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """Resolve the authenticated user from the bearer token, or raise 401."""
+async def resolve_user_from_token(token: str, db: AsyncSession) -> User:
+    """Decode a bearer token and load the user it names, or raise 401.
+
+    Shared by get_current_user (Authorization header, REST) and the /chat/ws
+    WebSocket endpoint (token as a query param - browsers can't set a
+    WebSocket's Authorization header, so the handshake URL carries it
+    instead).
+    """
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -51,15 +54,9 @@ async def get_current_user(
     return user
 
 
-def require_role(*roles: str) -> Callable[[User], User]:
-    """Dependency factory: 403s unless the current user's role is in `roles`."""
-
-    async def _check_role(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role.value not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions",
-            )
-        return current_user
-
-    return _check_role
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Resolve the authenticated user from the bearer token, or raise 401."""
+    return await resolve_user_from_token(token, db)

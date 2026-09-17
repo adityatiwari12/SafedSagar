@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Uuid
+from sqlalchemy import Date, DateTime, ForeignKey, Index, String, UniqueConstraint, Uuid
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,15 +14,18 @@ from app.db.base import Base
 
 
 class UserRole(str, enum.Enum):
-    """RBAC roles for platform users.
+    """Legacy single-role column type.
 
-    `admin` stays a single value for now (see
-    docs/product/rbac-architecture-and-ux-spec.md Section 0/"Open
-    decision" - splitting it into institutional_admin/ministry_admin/
-    kb_manager is a breaking migration that needs frontend coordination
-    first, deliberately not done in this change). `regulatory_expert` is
-    new: self-registerable-as-a-request, like `facilitator`, gated by
-    `verification_status`.
+    DEPRECATED as of docs/product/rbac-full-implementation-spec.md, which
+    resolves the "Open decision" this docstring used to describe. The
+    live source of truth for a user's roles is now the `user_roles`
+    (`UserRoleAssignment`) table, seeded from `roles`/8 values, not this
+    4-value enum. This column and enum stay only for the migration's
+    expand→migrate→contract window (spec Section 2): existing code paths
+    that still read `User.role` keep working during the cutover, but no
+    new authorization logic should be written against it - use
+    `app.authz.service` instead. Removed in a follow-up migration once
+    nothing reads this column.
     """
 
     user = "user"
@@ -77,6 +80,36 @@ class Jurisdiction(str, enum.Enum):
     international = "international"
 
 
+class OrganizationType(str, enum.Enum):
+    """What kind of entity an Organization row represents - drives no
+    permission differences by itself (an institution and a startup are
+    scoped identically), just a UI/reporting label."""
+
+    institution = "institution"
+    startup = "startup"
+    other = "other"
+
+
+class KnowledgeVisibility(str, enum.Enum):
+    """TK record visibility (docs/product/rbac-full-implementation-spec.md
+    Section 6). Default is `private` everywhere it's set - never `public`
+    by default, per the spec's explicit anti-extraction requirement."""
+
+    private = "private"
+    restricted = "restricted"
+    public = "public"
+
+
+class KnowledgeAccessRole(str, enum.Enum):
+    """Which kind of grantee a `knowledge_record_access` row names, when
+    it's a role-shaped grant (e.g. "any assigned facilitator on this
+    record's case") rather than one specific user."""
+
+    facilitator = "facilitator"
+    legal_expert = "legal_expert"
+    regulatory_expert = "regulatory_expert"
+
+
 class User(Base):
     """A platform user (end user, facilitator, or admin)."""
 
@@ -111,6 +144,12 @@ class User(Base):
     )
 
     conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="user"
+    )
+    role_assignments: Mapped[list["UserRoleAssignment"]] = relationship(
+        back_populates="user"
+    )
+    organization_memberships: Mapped[list["OrganizationMember"]] = relationship(
         back_populates="user"
     )
 
@@ -260,3 +299,161 @@ class SourceDocument(Base):
     source_url: Mapped[str | None] = mapped_column(String, nullable=True)
     last_verified_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     source_text: Mapped[str] = mapped_column(String, nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Permission engine (docs/product/rbac-full-implementation-spec.md Sections
+# 2-5). `Role`/`Permission` are seed DATA (plain unique strings), not Python
+# enums - the whole point of moving off the old 4-value `UserRole` enum is
+# that adding a role/permission should be a seed-data row, not a Postgres
+# `ALTER TYPE ... ADD VALUE` migration every time.
+# ---------------------------------------------------------------------------
+
+
+class Role(Base):
+    """A named role (`facilitator`, `kb_manager`, ...). See
+    app.authz.constants for the canonical set of role-name strings."""
+
+    __tablename__ = "roles"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    role_permissions: Mapped[list["RolePermission"]] = relationship(back_populates="role")
+
+
+class Permission(Base):
+    """A single resource+action permission (`case.create`, `source.publish`,
+    ...). `key` is what code checks (`has_permission(ctx, "case.create")`);
+    `resource`/`action` are the same thing split for querying/reporting."""
+
+    __tablename__ = "permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    resource: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    role_permissions: Mapped[list["RolePermission"]] = relationship(back_populates="permission")
+
+
+class RolePermission(Base):
+    """Grants one Permission to one Role. The role/permission matrix in
+    the spec is seeded as rows here (app/authz/seed.py), not hardcoded in
+    application logic."""
+
+    __tablename__ = "role_permissions"
+    __table_args__ = (UniqueConstraint("role_id", "permission_id", name="ux_role_permission"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id"), nullable=False)
+    permission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("permissions.id"), nullable=False)
+
+    role: Mapped["Role"] = relationship(back_populates="role_permissions")
+    permission: Mapped["Permission"] = relationship(back_populates="role_permissions")
+
+
+class Organization(Base):
+    """An institution, startup/MSME, or other entity that Cases/Products/
+    ResearchProjects/etc. can be scoped to (spec Section 3)."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    org_type: Mapped[OrganizationType] = mapped_column(
+        SAEnum(OrganizationType, name="organization_type"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    members: Mapped[list["OrganizationMember"]] = relationship(back_populates="organization")
+
+
+class OrganizationMember(Base):
+    """Plain membership - who belongs to which Organization. A member's
+    *role within* that org (institutional_admin, or just a plain user
+    affiliated with it) is a separate `UserRoleAssignment` row, not a
+    column here - this table only answers "is this user part of this
+    org," which every org-scope check needs regardless of role."""
+
+    __tablename__ = "organization_members"
+    __table_args__ = (UniqueConstraint("user_id", "organization_id", name="ux_org_member"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="organization_memberships")
+    organization: Mapped["Organization"] = relationship(back_populates="members")
+
+
+class UserRoleAssignment(Base):
+    """One (user, role[, organization]) grant - the live source of truth
+    for authorization (app.authz.service), superseding the legacy
+    `User.role` column (spec Section 2). `organization_id` is NULL for a
+    platform-wide role grant (ministry_admin, kb_manager, legal_expert,
+    facilitator, regulatory_expert, or a `user` role with no org
+    affiliation) and set for an org-scoped grant (institutional_admin for
+    one specific Organization).
+
+    A nullable column can't be part of a Postgres PRIMARY KEY, so this
+    uses a surrogate `id` plus two partial unique indexes (below) instead
+    of a composite key - one for org-scoped rows, one for NULL-org rows -
+    so "the same user can't hold the same role twice (in the same scope)"
+    is still enforced at the database level, not just in application code.
+    """
+
+    __tablename__ = "user_roles"
+    __table_args__ = (
+        Index(
+            "ux_user_role_scoped",
+            "user_id", "role_id", "organization_id",
+            unique=True,
+            postgresql_where="organization_id IS NOT NULL",
+        ),
+        Index(
+            "ux_user_role_unscoped",
+            "user_id", "role_id",
+            unique=True,
+            postgresql_where="organization_id IS NULL",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id"), nullable=False)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="role_assignments")
+    role: Mapped["Role"] = relationship()
+    organization: Mapped["Organization | None"] = relationship()

@@ -7,6 +7,20 @@ classification, use cases, expert workflow, AI/RAG requirements, answer
 UI, screen map, edge cases, acceptance criteria) still apply unchanged.
 This document is the schema/permission/case-model layer underneath them.
 
+**Phase 1 (Section 10): built.** `roles`/`permissions`/`role_permissions`/
+`user_roles`/`organizations`/`organization_members` schema + migration
+`a18b27770761` (seeds + backfills every existing user, reversible -
+verified via `alembic downgrade -1` + `upgrade head` round trip);
+`app/authz/` (`constants.py`, `seed.py`, `service.py` -
+`has_permission`/`has_any_grant`/`can_access_resource`/
+`can_perform_action`/`require_permission`); `app/auth`, `app/cases`,
+`app/admin` migrated off the deleted `require_role`; new
+`/admin/roles`, `/admin/organizations` (GET/POST),
+`/admin/users/{id}/roles` (POST/DELETE) endpoints with org-scope
+privilege-escalation guards; `tests/test_authz_matrix.py` +
+`tests/test_admin_rbac_endpoints.py` (44 tests total across the touched
+suite, all passing). Phases 2-9 not started.
+
 Written after a live requirements exchange that reconciled a much larger
 proposed model (11 roles, generic Permission engine, Organization,
 Case/Product/ResearchProject/KnowledgeRecord/Evidence/ExpertReview/
@@ -144,10 +158,10 @@ assignment — happens in `can_access_resource`, Section 5, not here):
 
 | Permission | user | facilitator | legal_expert | regulatory_expert | inst_admin | ministry_admin | kb_manager |
 |---|---|---|---|---|---|---|---|
-| ai.* | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| ai.* | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | case.create | ✓ | — | — | — | — | — | — |
 | case.view_own | ✓ | — | — | — | — | — | — |
-| case.view_queue | — | ✓ (ip queue) | ✓ (legal-escalation queue only) | ✓ (regulatory queue) | ✓ (own org) | ✓ (all) | — |
+| case.view_queue | — | ✓ (ip queue) | ✓ (legal-escalation queue only) | ✓ (regulatory queue) | **—** | **—** | — |
 | case.edit / case.assign | — | ✓ | ✓ | ✓ | — | — | — |
 | case.escalate | ✓ | ✓ | — | ✓ | — | — | — |
 | case.close | — | ✓ | ✓ | ✓ | — | — | — |
@@ -159,7 +173,7 @@ assignment — happens in `can_access_resource`, Section 5, not here):
 | review.escalate | — | ✓ | — | ✓ | — | — | — |
 | source.create / source.edit | — | — | — | — | — | — | ✓ |
 | source.verify / source.publish | — | — | — | — | — | — | ✓ (SoD-checked, Section 7) |
-| org.manage_members | — | — | — | — | ✓ (own org) | ✓ (all) | — |
+| org.manage_members | ✓ (own org, Section 4a) | — | — | — | ✓ (own org) | ✓ (all) | — |
 | users.manage | — | — | — | — | ✓ (own org) | ✓ (all) | — |
 | roles.manage / permissions.manage | — | — | — | — | — | ✓ | — |
 | system.configure | — | — | — | — | — | ✓ | — |
@@ -167,6 +181,30 @@ assignment — happens in `can_access_resource`, Section 5, not here):
 | analytics.personal | ✓ | — | — | — | — | — | — |
 | analytics.organization | — | — | — | — | ✓ | ✓ | — |
 | analytics.national | — | — | — | — | — | ✓ | ✓ (KB metrics only) |
+
+**Bold `case.view_queue` cells** were deliberately corrected from an
+earlier draft of this table that gave `inst_admin`/`ministry_admin`
+blanket case-detail visibility for "oversight" — that directly
+contradicts the spec's own Section 12 rule for Government/Ministry Admin
+("Do not expose confidential user cases/formulations unnecessarily") and
+its matrix, which leaves "Review Cases" blank for the Gov column. Admin
+tiers get oversight through `analytics.organization`/`analytics.national`
+(aggregate counts), never through raw case rows. `ai.*` was similarly
+corrected to be universal — every role can ask the assistant a question;
+the earlier draft withheld it from admin tiers with no basis in the
+spec's own text (its matrix shows "AI Ask ✓" across every column).
+
+### 4a. `org.manage_members` for `user` — scope note
+
+An AYUSH Startup/MSME persona account can add teammates to *their own*
+organization (the one they created or are already a member of) — this is
+`org.manage_members` granted to `user` but gated by `can_access_resource`
+to organizations the caller already belongs to, never any organization
+by ID. This is different in kind from `inst_admin`/`ministry_admin`'s
+grant of the same permission key, which is why the permission alone
+never fully answers an authorization question — Section 5's
+`can_access_resource` ownership/membership check is what actually
+differs here, not the permission key.
 
 Bold row is the structural enforcement of "infra/system admin ≠ legal
 decision maker" (Section 0): every admin-tier column is blank there, by
@@ -368,8 +406,9 @@ tracked separately, not attempted in one pass)
 8. Frontend: role-aware navigation shell + per-role dashboard modules,
    reusing existing chat/case components — not 8 separate apps.
 9. Ministry/government analytics: aggregated, privacy-preserving queries
-   only (no per-user/per-case drill-down for `ministry_admin`'s
-   analytics views, even though the role technically has `case.view_queue`
-   for oversight — the *analytics* surface specifically stays aggregate).
+   only — `ministry_admin`/`institutional_admin` have no `case.view_queue`
+   grant at all (Section 4), so there is no per-case drill-down to
+   restrict in the first place; analytics views only ever run `COUNT`/
+   `GROUP BY` aggregates, never a query that returns individual case rows.
 
 Tests (Section 9) land alongside Phase 1, not appended at the end.

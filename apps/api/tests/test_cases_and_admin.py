@@ -45,14 +45,14 @@ async def _seed_open_case(user_email_suffix: str) -> tuple[str, str]:
 
 
 async def test_case_queue_requires_facilitator_role(client, make_user):
-    _email, _password, user_token = await make_user(role=UserRole.user)
+    _email, _password, user_token = await make_user(role="user")
     resp = await client.get("/cases", headers={"Authorization": f"Bearer {user_token}"})
     assert resp.status_code == 403
 
 
 async def test_case_queue_lists_open_case(client, make_user):
     case_id, user_email = await _seed_open_case(uuid.uuid4().hex[:8])
-    _email, _password, fac_token = await make_user(role=UserRole.facilitator)
+    _email, _password, fac_token = await make_user(role="facilitator")
 
     resp = await client.get("/cases", headers={"Authorization": f"Bearer {fac_token}"})
     assert resp.status_code == 200
@@ -67,7 +67,7 @@ async def test_case_queue_lists_open_case(client, make_user):
 
 async def test_regulatory_expert_can_also_see_and_claim_case(client, make_user):
     case_id, _user_email = await _seed_open_case(uuid.uuid4().hex[:8])
-    _email, _password, expert_token = await make_user(role=UserRole.regulatory_expert)
+    _email, _password, expert_token = await make_user(role="regulatory_expert")
 
     claim_resp = await client.post(
         f"/cases/{case_id}/claim", headers={"Authorization": f"Bearer {expert_token}"}
@@ -79,7 +79,7 @@ async def test_regulatory_expert_can_also_see_and_claim_case(client, make_user):
 
 async def test_close_case_sets_resolution(client, make_user):
     case_id, _user_email = await _seed_open_case(uuid.uuid4().hex[:8])
-    _email, _password, fac_token = await make_user(role=UserRole.facilitator)
+    _email, _password, fac_token = await make_user(role="facilitator")
 
     resp = await client.post(
         f"/cases/{case_id}/close",
@@ -94,21 +94,21 @@ async def test_close_case_sets_resolution(client, make_user):
 
 
 async def test_claim_nonexistent_case_404(client, make_user):
-    _email, _password, fac_token = await make_user(role=UserRole.facilitator)
+    _email, _password, fac_token = await make_user(role="facilitator")
     resp = await client.post(
         f"/cases/{uuid.uuid4()}/claim", headers={"Authorization": f"Bearer {fac_token}"}
     )
     assert resp.status_code == 404
 
 
-async def test_admin_users_requires_admin_role(client, make_user):
-    _email, _password, fac_token = await make_user(role=UserRole.facilitator)
+async def test_admin_users_requires_users_manage_permission(client, make_user):
+    _email, _password, fac_token = await make_user(role="facilitator")
     resp = await client.get("/admin/users", headers={"Authorization": f"Bearer {fac_token}"})
     assert resp.status_code == 403
 
 
 async def test_admin_users_lists_users(client, make_user):
-    email, _password, admin_token = await make_user(role=UserRole.admin)
+    email, _password, admin_token = await make_user(role="ministry_admin")
     resp = await client.get("/admin/users", headers={"Authorization": f"Bearer {admin_token}"})
     assert resp.status_code == 200
     emails = [u["email"] for u in resp.json()]
@@ -116,7 +116,7 @@ async def test_admin_users_lists_users(client, make_user):
 
 
 async def test_admin_stats_shape(client, make_user):
-    _email, _password, admin_token = await make_user(role=UserRole.admin)
+    _email, _password, admin_token = await make_user(role="ministry_admin")
     resp = await client.get("/admin/stats", headers={"Authorization": f"Bearer {admin_token}"})
     assert resp.status_code == 200
     body = resp.json()

@@ -13,3 +13,42 @@ class UserSummary(BaseModel):
     persona: str | None
     verification_status: str
     created_at: datetime
+
+
+class RoleOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class OrganizationOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    org_type: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class OrganizationCreate(BaseModel):
+    name: str
+    org_type: str = "other"
+
+
+class RoleAssignmentOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    role_name: str
+    organization_id: uuid.UUID | None
+
+
+class RoleAssignmentCreate(BaseModel):
+    role_name: str
+    # None = platform-wide grant. Only a caller with a platform-wide
+    # roles.manage grant (ministry_admin) may assign a NULL-org grant;
+    # an institutional_admin may only assign within an organization_id
+    # they themselves have users.manage over (enforced in the route, not
+    # just by this schema accepting the field).
+    organization_id: uuid.UUID | None = None
