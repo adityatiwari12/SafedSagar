@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_db
 from app.authz.constants import Permission
 from app.authz.service import AuthzContext, can_access_resource, require_permission
-from app.db.models import AuditLogEntry, Product
+from app.cases.router import _to_case_out
+from app.cases.schemas import CaseOut
+from app.db.models import AuditLogEntry, Case, Product
 from app.graph.state import PRODUCT_CATEGORIES
 from app.products.schemas import ProductCreate, ProductOut, ProductUpdate
 
@@ -111,6 +113,28 @@ async def get_product(
     if not can_access_resource(ctx, product):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your product")
     return product
+
+
+@router.get("/{product_id}/cases", response_model=list[CaseOut])
+async def get_product_cases(
+    product_id: uuid.UUID,
+    ctx: AuthzContext = Depends(require_permission(Permission.PRODUCT_VIEW)),
+    db: AsyncSession = Depends(get_db),
+) -> list[CaseOut]:
+    """Cases (chat turns) linked to this product - feeds the product
+    dossier's Assessments tab. Same ownership gate as get_product: 404 if
+    the product doesn't exist, 403 if it exists but isn't the caller's."""
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if not can_access_resource(ctx, product):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your product")
+
+    result = await db.execute(
+        select(Case).where(Case.product_id == product_id).order_by(Case.created_at.desc())
+    )
+    cases = list(result.scalars().all())
+    return [await _to_case_out(db, c) for c in cases]
 
 
 @router.patch("/{product_id}", response_model=ProductOut)

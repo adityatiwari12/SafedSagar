@@ -524,6 +524,12 @@ class Case(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("conversations.id"), nullable=True)
+    # Which Product dossier (if any) this chat turn was asked about -
+    # optional, set from ChatTurnRequest.productId (app/chat/router.py).
+    # NULL for a turn not tied to a specific product.
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("products.id"), nullable=True, index=True
+    )
 
     question: Mapped[str] = mapped_column(String, nullable=False)
     language: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -563,6 +569,7 @@ class Case(Base):
     assigned_to: Mapped["User | None"] = relationship(foreign_keys=[assigned_to_user_id])
     organization: Mapped["Organization | None"] = relationship()
     conversation: Mapped["Conversation | None"] = relationship()
+    product: Mapped["Product | None"] = relationship()
 
 
 class ExpertReview(Base):

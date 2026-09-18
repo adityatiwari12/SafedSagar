@@ -23,6 +23,8 @@ class CaseOut(BaseModel):
     created_at: datetime
     closed_at: datetime | None
     resolution_summary: str | None
+    product_id: uuid.UUID | None = None
+    product_name: str | None = None
 
 
 class CloseCaseRequest(BaseModel):

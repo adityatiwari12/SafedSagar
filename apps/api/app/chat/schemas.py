@@ -12,6 +12,10 @@ class ChatTurnRequest(BaseModel):
     jurisdiction: str = "india"  # "india" | "international"
     answers: dict[str, str] | None = None
     language: str | None = None
+    # Optional Product dossier this turn is about (app/products/router.py).
+    # Must be a product the caller owns or shares an organization with -
+    # validated in app.chat.router._resolve_authorized_product.
+    productId: str | None = None
 
 
 class ClassificationOut(BaseModel):

@@ -36,6 +36,8 @@ from app.db.models import (
     EscalationItem,
     Message,
     MessageRole,
+    OrganizationMember,
+    Product,
     User,
 )
 from app.graph.graph import NodeDoneCallback, run_classification, run_graph, run_remaining
@@ -218,6 +220,46 @@ def _abs_tk_flags(state: GraphState) -> AbsTkFlagsOut | None:
     )
 
 
+async def _resolve_authorized_product(
+    db: AsyncSession, current_user: User, product_id: str | None
+) -> Product | None:
+    """Validate an optional payload.productId: it must be a real Product
+    the caller owns or shares an organization with. Returns None when no
+    productId was supplied.
+
+    Raises 404 - never 403 - for a missing or not-theirs product. The
+    caller supplied this id as a parameter to their OWN chat turn, so
+    there is no legitimate reason for them to be probing someone else's
+    product; a 403 would confirm the id exists and belongs to someone
+    else, leaking its existence. 404 gives no such signal either way.
+    """
+    if not product_id:
+        return None
+    try:
+        product_uuid = uuid.UUID(product_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found") from exc
+
+    product = await db.get(Product, product_uuid)
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if product.owner_user_id == current_user.id:
+        return product
+
+    if product.organization_id is not None:
+        member = await db.scalar(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == current_user.id,
+                OrganizationMember.organization_id == product.organization_id,
+            )
+        )
+        if member is not None:
+            return product
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+
 async def _create_case(
     db: AsyncSession,
     *,
@@ -227,6 +269,7 @@ async def _create_case(
     target_language: str,
     state: GraphState,
     response: "ChatTurnResponse",
+    product_id: uuid.UUID | None = None,
 ) -> Case:
     """Persist a Case for this turn - every answered turn (including an
     out-of-scope refusal), never a clarifying-question round (spec
@@ -243,6 +286,7 @@ async def _create_case(
     case = Case(
         user_id=current_user.id,
         conversation_id=conversation.id,
+        product_id=product_id,
         question=question,
         language=target_language,
         product_classification=response.classification.product_type,
@@ -278,6 +322,7 @@ async def _process_chat_turn(
     graph actually progresses, via NODE_TO_STEP above.
     """
     jurisdiction = payload.jurisdiction if payload.jurisdiction in _VALID_JURISDICTIONS else None
+    product = await _resolve_authorized_product(db, current_user, payload.productId)
     conversation = await _get_or_create_conversation(db, current_user, payload.conversationId)
 
     # Multilingual entry point (task Section 6/9): detect the query's
@@ -384,6 +429,7 @@ async def _process_chat_turn(
                 target_language=target_language,
                 state=classify_state,
                 response=response,
+                product_id=product.id if product else None,
             )
             await db.commit()
             return response
@@ -514,6 +560,7 @@ async def _process_chat_turn(
         target_language=target_language,
         state=state,
         response=response,
+        product_id=product.id if product else None,
     )
 
     await db.commit()

@@ -16,7 +16,7 @@ from app.auth.dependencies import get_db
 from app.authz.constants import Permission, RoleName
 from app.authz.service import AuthzContext, can_access_resource, has_any_grant, require_permission
 from app.cases.schemas import CaseOut, CloseCaseRequest, ReviewActionOut, ReviewActionRequest
-from app.db.models import AuditLogEntry, Case, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction, User
+from app.db.models import AuditLogEntry, Case, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction, Product, User
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -72,6 +72,11 @@ async def _to_case_out(db: AsyncSession, case: Case) -> CaseOut:
         last_assistant = msg_result.scalar_one_or_none()
         answer = last_assistant.content if last_assistant else ""
 
+    product_name = None
+    if case.product_id is not None:
+        product = await db.get(Product, case.product_id)
+        product_name = product.name if product else None
+
     return CaseOut(
         id=case.id,
         status=case.status.value,
@@ -89,6 +94,8 @@ async def _to_case_out(db: AsyncSession, case: Case) -> CaseOut:
         created_at=case.created_at,
         closed_at=case.closed_at,
         resolution_summary=case.resolution_summary,
+        product_id=case.product_id,
+        product_name=product_name,
     )
 
 
