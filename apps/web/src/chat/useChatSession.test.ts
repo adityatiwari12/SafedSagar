@@ -90,3 +90,44 @@ test('changing jurisdiction re-sends the last user turn with the new jurisdictio
     ),
   )
 })
+
+test('includes the active product id on turns while a product is set, and stops once dismissed', async () => {
+  ;(chatApi.sendTurnStreaming as ReturnType<typeof vi.fn>).mockResolvedValue({
+    conversationId: 'conv-1',
+    classification: { product_type: 'ayurvedic_formulation', ip_type: 'patent' },
+    jurisdiction: 'india',
+    answer: 'answer text',
+    citations: [],
+    confidence: 0.7,
+    confidence_band: 'medium',
+    escalate_recommended: false,
+  })
+
+  const { result } = renderHook(() => useChatSession())
+
+  act(() => {
+    result.current.setActiveProduct({ id: 'p1', name: 'Ashwagandha capsules' })
+  })
+
+  await act(async () => {
+    await result.current.sendMessage('About my product')
+  })
+
+  expect(chatApi.sendTurnStreaming).toHaveBeenLastCalledWith(
+    expect.objectContaining({ productId: 'p1' }),
+    expect.any(Function),
+  )
+
+  act(() => {
+    result.current.setActiveProduct(null)
+  })
+
+  await act(async () => {
+    await result.current.sendMessage('A follow-up with no product')
+  })
+
+  expect(chatApi.sendTurnStreaming).toHaveBeenLastCalledWith(
+    expect.objectContaining({ productId: null }),
+    expect.any(Function),
+  )
+})

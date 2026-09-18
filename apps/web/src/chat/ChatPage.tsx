@@ -25,10 +25,18 @@ export default function ChatPage() {
   const location = useLocation()
 
   useEffect(() => {
-    const seeded = (location.state as { seededDraft?: string } | null)?.seededDraft
-    if (seeded) {
-      setDraft(seeded)
-      // Clear so a page refresh / back-nav doesn't re-seed the draft.
+    const navState = location.state as
+      | { seededDraft?: string; activeProduct?: { id: string; name: string } }
+      | null
+    if (navState?.seededDraft) {
+      setDraft(navState.seededDraft)
+    }
+    if (navState?.activeProduct) {
+      session.setActiveProduct(navState.activeProduct)
+    }
+    if (navState?.seededDraft || navState?.activeProduct) {
+      // Clear so a page refresh / back-nav doesn't re-seed the draft or
+      // re-attach the product association.
       window.history.replaceState({}, '')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,6 +212,21 @@ export default function ChatPage() {
               )}
 
               <div className="shrink-0 border-t border-surface-border bg-white p-3 sm:p-4">
+                {session.activeProduct && (
+                  <div className="mx-auto mb-2 flex w-full max-w-3xl items-center justify-between gap-2 rounded-full border border-saffron/50 bg-orange-50 px-3 py-1.5 text-xs text-ink">
+                    <span>
+                      Assessing: <span className="font-semibold">{session.activeProduct.name}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="font-semibold text-ink-muted underline hover:text-ink"
+                      onClick={() => session.setActiveProduct(null)}
+                      aria-label={`Stop assessing ${session.activeProduct.name}`}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
                 <form onSubmit={onSubmit} className="mx-auto w-full max-w-3xl">
                   <div className="flex items-end gap-2 rounded-3xl border border-surface-border bg-white py-1.5 pl-4 pr-1.5 shadow-panel focus-within:border-saffron">
                     <label htmlFor="question" className="sr-only">

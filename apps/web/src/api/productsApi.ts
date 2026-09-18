@@ -1,5 +1,6 @@
 import { apiFetch } from './http'
 import { getStoredToken } from '../auth/AuthContext'
+import { CaseItem } from './casesApi'
 
 export const PRODUCT_CLASSIFICATIONS = [
   'classical_or_generic_medicine',
@@ -75,6 +76,9 @@ export const productsApi = {
   },
   remove(id: string): Promise<void> {
     return apiFetch<void>(`/products/${id}`, { method: 'DELETE' }, getStoredToken())
+  },
+  getCases(id: string): Promise<CaseItem[]> {
+    return apiFetch<CaseItem[]>(`/products/${id}/cases`, {}, getStoredToken())
   },
 }
 

@@ -30,16 +30,30 @@ export interface Turn {
   response?: ChatTurnResponse
 }
 
+export interface ActiveProduct {
+  id: string
+  name: string
+}
+
 let turnCounter = 0
 function nextTurnId() {
   turnCounter += 1
   return `turn-${turnCounter}`
 }
 
-export function useChatSession() {
+export function useChatSession(initialProduct?: ActiveProduct | null) {
   const [turns, setTurns] = useState<Turn[]>([])
   const [jurisdiction, setJurisdictionState] = useState<'india' | 'international'>('india')
   const [language, setLanguageState] = useState<LanguageCode>(loadStoredLanguage)
+  // Product dossier the conversation is currently scoped to - included as
+  // productId on every turn sent while set, so the Case that turn creates
+  // links back to the product. Dismissing it (see clearActiveProduct)
+  // clears it for turns going forward only; it never rewrites turns
+  // already sent.
+  const [activeProduct, setActiveProductState] = useState<ActiveProduct | null>(
+    initialProduct ?? null,
+  )
+  const activeProductRef = useRef<ActiveProduct | null>(initialProduct ?? null)
   const [status, setStatus] = useState<'idle' | 'sending' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [pendingClarifying, setPendingClarifying] = useState<string[] | null>(null)
@@ -59,6 +73,11 @@ export function useChatSession() {
     setConversationIdState(id)
   }, [])
 
+  const setActiveProduct = useCallback((product: ActiveProduct | null) => {
+    activeProductRef.current = product
+    setActiveProductState(product)
+  }, [])
+
   const runTurn = useCallback(
     async (text: string, answers?: Record<string, string>, juris?: 'india' | 'international') => {
       setStatus('sending')
@@ -72,6 +91,7 @@ export function useChatSession() {
             jurisdiction: juris ?? jurisdiction,
             answers,
             language,
+            productId: activeProductRef.current?.id ?? null,
           },
           setLiveStep,
         )
@@ -216,6 +236,8 @@ export function useChatSession() {
     error,
     pendingClarifying,
     liveStep,
+    activeProduct,
+    setActiveProduct,
     setLanguage,
     setJurisdiction,
     sendMessage,

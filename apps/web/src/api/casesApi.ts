@@ -4,6 +4,12 @@ import { getStoredToken } from '../auth/AuthContext'
 export interface CaseItem {
   id: string
   status: 'open' | 'in_progress' | 'closed'
+  // Backend CaseStatus/CaseQueue/CaseRiskLevel have a wider value set than
+  // the `status` union above already accounted for (app/db/models.py) -
+  // kept as plain strings here so a value this type doesn't enumerate
+  // doesn't fail to typecheck, matching how `status` itself is handled.
+  queue: string | null
+  risk_level: string
   question: string
   answer: string
   reason: string | null
@@ -16,6 +22,10 @@ export interface CaseItem {
   created_at: string
   closed_at: string | null
   resolution_summary: string | null
+  // Additive: which Product dossier (if any) this case is linked to -
+  // null for a case not tied to a specific product.
+  product_id: string | null
+  product_name: string | null
 }
 
 export const casesApi = {

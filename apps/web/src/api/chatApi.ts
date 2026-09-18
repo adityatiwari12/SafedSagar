@@ -8,6 +8,9 @@ export interface ChatTurnInput {
   jurisdiction: 'india' | 'international'
   answers?: Record<string, string>
   language?: LanguageCode
+  // Product dossier this turn is scoped to, if any - the Case this turn
+  // creates gets linked to it server-side. null/undefined means unscoped.
+  productId?: string | null
 }
 
 export interface Citation {

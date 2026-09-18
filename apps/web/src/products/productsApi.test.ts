@@ -63,3 +63,39 @@ test('get surfaces a non-ok response as ApiError', async () => {
   await expect(productsApi.get('missing')).rejects.toBeInstanceOf(ApiError)
   await expect(productsApi.get('missing')).rejects.toMatchObject({ status: 404 })
 })
+
+test('getCases hits /products/{id}/cases and parses the extended case list', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => [
+      {
+        id: 'c1',
+        status: 'open',
+        queue: 'ip',
+        risk_level: 'high',
+        question: 'Can I patent this?',
+        answer: '',
+        reason: null,
+        product_classification: null,
+        jurisdiction: 'india',
+        confidence_score: 0.4,
+        confidence_level: 'low',
+        assigned_facilitator_email: null,
+        user_email: 'a@b.com',
+        created_at: NOW,
+        closed_at: null,
+        resolution_summary: null,
+        product_id: 'p1',
+        product_name: 'Ashwagandha capsules',
+      },
+    ],
+  })
+
+  const cases = await productsApi.getCases('p1')
+
+  expect(cases).toHaveLength(1)
+  expect(cases[0]).toMatchObject({ id: 'c1', product_id: 'p1', product_name: 'Ashwagandha capsules' })
+  const [url] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/products/p1/cases')
+})

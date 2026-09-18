@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppShell } from '../layout/AppShell'
 import { ApiError } from '../api/http'
+import { CaseItem } from '../api/casesApi'
+import { StatusBadge, RiskBadge } from '../cases/caseBadges'
 import {
   humanizeClassification,
   PRODUCT_CLASSIFICATIONS,
@@ -10,7 +12,7 @@ import {
   productsApi,
 } from '../api/productsApi'
 
-const TABS = ['Overview', 'Formulation', 'Classification', 'Status'] as const
+const TABS = ['Overview', 'Formulation', 'Classification', 'Status', 'Assessments'] as const
 type Tab = (typeof TABS)[number]
 
 const LATER_PHASE_TABS = [
@@ -20,7 +22,6 @@ const LATER_PHASE_TABS = [
   'TK',
   'ABS',
   'Documents',
-  'Assessments',
   'Activity',
 ] as const
 
@@ -256,9 +257,36 @@ function DeleteConfirm({
   )
 }
 
+// Navigates to the chat page with a product-scoped draft seeded, mirroring
+// ClassificationWizard's existing seededDraft precedent (navigate('/ask',
+// { state: { seededDraft } })) plus an activeProduct so useChatSession
+// includes productId on every turn while it's active.
+function AskAboutProductButton({ product, className }: { product: Product; className?: string }) {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      className={className ?? 'gov-btn-primary'}
+      onClick={() =>
+        navigate('/ask', {
+          state: {
+            seededDraft: `About my product "${product.name}": `,
+            activeProduct: { id: product.id, name: product.name },
+          },
+        })
+      }
+    >
+      Ask about this product
+    </button>
+  )
+}
+
 function OverviewTab({ product }: { product: Product }) {
   return (
     <dl className="grid gap-4 sm:grid-cols-2">
+      <div className="sm:col-span-2 flex justify-end">
+        <AskAboutProductButton product={product} />
+      </div>
       <div className="sm:col-span-2">
         <dt className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Description</dt>
         <dd className="mt-1 whitespace-pre-wrap text-sm text-ink">
@@ -407,6 +435,83 @@ function StatusTab({ product }: { product: Product }) {
   )
 }
 
+function AssessmentCard({ item }: { item: CaseItem }) {
+  return (
+    <div className="gov-panel space-y-2 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={item.status} />
+          <RiskBadge risk={item.risk_level} />
+        </div>
+        <span className="text-xs text-ink-faint">{new Date(item.created_at).toLocaleString()}</span>
+      </div>
+      <p className="line-clamp-2 text-sm text-ink">{item.question}</p>
+      <p className="text-xs text-ink-muted">
+        Confidence: {item.confidence_level ?? 'n/a'}
+        {item.confidence_score != null ? ` (${Math.round(item.confidence_score * 100)}%)` : ''}
+      </p>
+    </div>
+  )
+}
+
+function AssessmentsTab({ product }: { product: Product }) {
+  const [cases, setCases] = useState<CaseItem[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await productsApi.getCases(product.id)
+      setCases(data)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load assessments')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id])
+
+  if (loading) {
+    return <p className="text-sm text-ink-muted">Loading assessments…</p>
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-sm bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p>{error}</p>
+        <button type="button" className="gov-btn-secondary mt-2 !py-1 text-xs" onClick={() => void load()}>
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  if (!cases || cases.length === 0) {
+    return (
+      <div className="gov-panel space-y-3 border-dashed p-6 text-center">
+        <p className="text-sm text-ink-muted">No assessments yet for this product.</p>
+        <div className="flex justify-center">
+          <AskAboutProductButton product={product} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {cases.map((c) => (
+        <AssessmentCard key={c.id} item={c} />
+      ))}
+    </div>
+  )
+}
+
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -521,6 +626,7 @@ export default function ProductDetailPage() {
               {tab === 'Formulation' && <FormulationTab product={product} />}
               {tab === 'Classification' && <ClassificationTab product={product} />}
               {tab === 'Status' && <StatusTab product={product} />}
+              {tab === 'Assessments' && <AssessmentsTab product={product} />}
             </div>
           </>
         )}
