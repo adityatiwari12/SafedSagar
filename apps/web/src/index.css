@@ -18,6 +18,7 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 7.5rem;
   }
   body {
     margin: 0;
@@ -157,7 +158,10 @@
   }
   .gov-input:focus {
     border-color: var(--saffron);
-    outline: none;
+  }
+  .gov-input:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
   }
   .gov-label {
     display: block;
@@ -173,23 +177,28 @@
 
   .skip-link {
     position: absolute;
+    left: -10000px;
+    top: auto;
     width: 1px;
     height: 1px;
-    margin: -1px;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    z-index: 100;
   }
-  .skip-link:focus {
+  .skip-link:focus,
+  .skip-link:focus-visible {
+    position: fixed;
     left: 0.75rem;
     top: 0.75rem;
-    z-index: 60;
     width: auto;
     height: auto;
-    margin: 0;
-    clip: auto;
+    overflow: visible;
     padding: 0.5rem 1rem;
     background: var(--saffron);
     color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    outline: 3px solid #fff;
+    outline-offset: 2px;
   }
 
   .evidence-line {
@@ -277,6 +286,9 @@
     border-color: var(--forest);
   }
   .border-surface-border {
+    border-color: var(--border);
+  }
+  .border-line {
     border-color: var(--border);
   }
   .max-w-portal {

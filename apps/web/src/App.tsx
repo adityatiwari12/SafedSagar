@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
+import { LanguageProvider } from './i18n/LanguageContext'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import RolePlaceholderPage from './pages/RolePlaceholderPage'
@@ -14,6 +15,7 @@ import ProductDetailPage from './products/ProductDetailPage'
 
 export default function App() {
   return (
+    <LanguageProvider>
     <AuthProvider>
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -78,5 +80,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
+    </LanguageProvider>
   )
 }

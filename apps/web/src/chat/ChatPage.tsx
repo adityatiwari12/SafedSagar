@@ -2,6 +2,7 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AppShell } from '../layout/AppShell'
 import { isRtl } from '../api/languages'
+import { useLanguage } from '../i18n/LanguageContext'
 import { useChatSession } from './useChatSession'
 import { MessageBubble } from './MessageBubble'
 import { ClarifyingQuestionForm } from './ClarifyingQuestionForm'
@@ -12,31 +13,27 @@ import { ThinkingIndicator } from './ThinkingIndicator'
 import { ChatHistorySidebar } from './ChatHistorySidebar'
 import { GuidedIntakeForm } from './GuidedIntakeForm'
 
-const EXAMPLES = [
-  'I developed a new Ayurvedic formulation using Ashwagandha. Can I patent it?',
-  'What ABS obligations apply if I commercially use Indian medicinal plants?',
-  'We want to market an Ayurveda Aahara food product — what FSSAI rules apply?',
-]
-
 export default function ChatPage() {
   const session = useChatSession()
+  const { t } = useLanguage()
   const [draft, setDraft] = useState('')
   const [showGuided, setShowGuided] = useState(false)
   const location = useLocation()
 
+  const examples = useMemo(() => [t('ask.s1'), t('ask.s2'), t('ask.s3')], [t])
+
   useEffect(() => {
     const navState = location.state as
-      | { seededDraft?: string; activeProduct?: { id: string; name: string } }
+      | {
+          seededDraft?: string
+          prefill?: string
+          activeProduct?: { id: string; name: string }
+        }
       | null
-    if (navState?.seededDraft) {
-      setDraft(navState.seededDraft)
-    }
-    if (navState?.activeProduct) {
-      session.setActiveProduct(navState.activeProduct)
-    }
-    if (navState?.seededDraft || navState?.activeProduct) {
-      // Clear so a page refresh / back-nav doesn't re-seed the draft or
-      // re-attach the product association.
+    const draftText = navState?.seededDraft ?? navState?.prefill
+    if (draftText) setDraft(draftText)
+    if (navState?.activeProduct) session.setActiveProduct(navState.activeProduct)
+    if (draftText || navState?.activeProduct) {
       window.history.replaceState({}, '')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,19 +41,16 @@ export default function ChatPage() {
 
   const latestAssistant = useMemo(() => {
     for (let i = session.turns.length - 1; i >= 0; i -= 1) {
-      const t = session.turns[i]
-      if (t.role === 'assistant' && t.response) return t.response
+      const turn = session.turns[i]
+      if (turn.role === 'assistant' && turn.response) return turn.response
     }
     return null
   }, [session.turns])
 
-  // Live /chat/ws progress while a turn is in flight; once it settles,
-  // fall back to deriving from the last finished response (also covers
-  // conversations reopened from history, which have no live events).
   const activeStep =
     session.liveStep ??
     deriveJourneyStep({
-      hasUserMessage: session.turns.some((t) => t.role === 'user'),
+      hasUserMessage: session.turns.some((turn) => turn.role === 'user'),
       pendingClarifying: Boolean(session.pendingClarifying?.length),
       latest: latestAssistant,
     })
@@ -77,8 +71,6 @@ export default function ChatPage() {
   }
 
   function onComposerKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter sends, Shift+Enter inserts a newline - standard chat-composer
-    // convention (ChatGPT, Slack, etc).
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       void submitDraft()
@@ -86,6 +78,39 @@ export default function ChatPage() {
   }
 
   const composerRows = Math.min(6, Math.max(1, draft.split('\n').length))
+
+  const mobileExtras = (
+    <div className="flex flex-col gap-3">
+      <EscalateButton
+        emphasized={Boolean(latestAssistant?.escalate_recommended)}
+        disabled={session.status === 'sending'}
+        onEscalate={session.escalate}
+      />
+      <details className="gov-panel">
+        <summary className="cursor-pointer px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+          {t('chat.history')}
+        </summary>
+        <div className="h-64 border-t border-surface-border p-3">
+          <ChatHistorySidebar
+            activeConversationId={session.conversationId}
+            onSelect={(id) => void session.loadConversation(id)}
+            onNewChat={session.startNewChat}
+            onDeleted={() => session.startNewChat()}
+            refreshKey={session.turns.length}
+          />
+        </div>
+      </details>
+      <details className="gov-panel">
+        <summary className="cursor-pointer px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+          {t('chat.howWorksDetails')}
+        </summary>
+        <div className="flex flex-col gap-3 border-t border-surface-border p-3">
+          <GuidanceRail />
+          <CorpusNote />
+        </div>
+      </details>
+    </div>
+  )
 
   return (
     <AppShell
@@ -98,10 +123,10 @@ export default function ChatPage() {
       language={session.language}
       onLanguageChange={session.setLanguage}
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
         <JourneyStepper active={activeStep} />
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[16rem_1fr_19rem]">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[16rem_1fr_19rem]">
           <div className="hidden min-h-0 lg:block">
             <ChatHistorySidebar
               activeConversationId={session.conversationId}
@@ -112,15 +137,15 @@ export default function ChatPage() {
             />
           </div>
 
-          <div className="min-h-0">
-            {/* dir scoped to just the chat panel - task Section 8: don't make
-                the whole app RTL when Urdu isn't active. */}
+          <div className="min-h-0 overflow-hidden">
             <div
               className="gov-panel flex h-full min-h-0 flex-col overflow-hidden"
               dir={isRtl(session.language) ? 'rtl' : 'ltr'}
             >
               <div className="scroll-thin min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6" aria-live="polite">
                 <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+                  <div className="lg:hidden">{mobileExtras}</div>
+
                   {session.turns.length === 0 && showGuided && (
                     <GuidedIntakeForm
                       onCancel={() => setShowGuided(false)}
@@ -132,32 +157,29 @@ export default function ChatPage() {
                   )}
 
                   {session.turns.length === 0 && !showGuided && (
-                    <div className="rounded-lg border border-dashed border-surface-border bg-surface-muted/60 p-5 text-sm text-ink-muted">
-                      <p className="text-base font-semibold text-navy">
-                        Describe your product or IP question
-                      </p>
-                      <p className="mt-1">
-                        Ministry of Ayush guidance for Ayurveda practitioners, researchers,
-                        startups and cultivators. India and international jurisdictions are kept
-                        separate — set the toggle above before or during your conversation.
-                      </p>
+                    <div className="rounded-sm border border-dashed border-surface-border bg-ivory p-5 text-sm text-ink-muted">
+                      <p className="text-base font-semibold text-forest">{t('chat.emptyTitle')}</p>
+                      <p className="mt-1">{t('chat.emptyBody')}</p>
                       <p className="mt-3">
-                        Try one of these, write your own below, or{' '}
+                        {t('chat.emptyGuidedLead')}{' '}
                         <button
                           type="button"
-                          className="font-semibold text-primary underline"
+                          className="font-semibold text-saffron-deep underline"
                           onClick={() => setShowGuided(true)}
                         >
-                          let us walk you through it step by step
+                          {t('chat.emptyGuidedCta')}
                         </button>
                         .
                       </p>
-                      <ul className="mt-3 space-y-2">
-                        {EXAMPLES.map((ex) => (
+                      <p className="mt-3 text-xs font-bold uppercase tracking-wide text-ink-faint">
+                        {t('chat.examplesHeading')}
+                      </p>
+                      <ul className="mt-2 space-y-2">
+                        {examples.map((ex) => (
                           <li key={ex}>
                             <button
                               type="button"
-                              className="w-full rounded-lg border border-surface-border bg-white px-3 py-2 text-left text-sm text-ink hover:border-primary hover:bg-blue-50"
+                              className="w-full rounded-sm border border-surface-border bg-white px-3 py-2 text-left text-sm text-ink hover:border-saffron hover:bg-ivory"
                               onClick={() => setDraft(ex)}
                             >
                               {ex}
@@ -178,7 +200,7 @@ export default function ChatPage() {
                     </MessageBubble>
                   ))}
 
-                  {session.status === 'sending' && <ThinkingIndicator />}
+                  {session.status === 'sending' && <ThinkingIndicator liveStep={session.liveStep} />}
                 </div>
               </div>
 
@@ -205,7 +227,7 @@ export default function ChatPage() {
                       className="gov-btn-secondary mt-2 !py-1"
                       onClick={() => void session.retryLast()}
                     >
-                      Retry
+                      {t('chat.retry')}
                     </button>
                   </div>
                 </div>
@@ -213,29 +235,30 @@ export default function ChatPage() {
 
               <div className="shrink-0 border-t border-surface-border bg-white p-3 sm:p-4">
                 {session.activeProduct && (
-                  <div className="mx-auto mb-2 flex w-full max-w-3xl items-center justify-between gap-2 rounded-full border border-saffron/50 bg-orange-50 px-3 py-1.5 text-xs text-ink">
+                  <div className="mx-auto mb-2 flex w-full max-w-3xl items-center justify-between gap-2 rounded-sm border border-saffron/50 bg-orange-50 px-3 py-1.5 text-xs text-ink">
                     <span>
-                      Assessing: <span className="font-semibold">{session.activeProduct.name}</span>
+                      {t('chat.assessing')}:{' '}
+                      <span className="font-semibold">{session.activeProduct.name}</span>
                     </span>
                     <button
                       type="button"
                       className="font-semibold text-ink-muted underline hover:text-ink"
                       onClick={() => session.setActiveProduct(null)}
-                      aria-label={`Stop assessing ${session.activeProduct.name}`}
+                      aria-label={`${t('chat.dismiss')} ${session.activeProduct.name}`}
                     >
-                      Dismiss
+                      {t('chat.dismiss')}
                     </button>
                   </div>
                 )}
                 <form onSubmit={onSubmit} className="mx-auto w-full max-w-3xl">
-                  <div className="flex items-end gap-2 rounded-3xl border border-surface-border bg-white py-1.5 pl-4 pr-1.5 shadow-panel focus-within:border-saffron">
+                  <div className="flex items-end gap-2 rounded-sm border border-surface-border bg-white py-1.5 pl-3 pr-1.5 shadow-panel focus-within:border-saffron">
                     <label htmlFor="question" className="sr-only">
-                      Your question
+                      {t('chat.yourQuestion')}
                     </label>
                     <textarea
                       id="question"
-                      className="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-ink-faint"
-                      placeholder="Describe your product or ask an IP / ABS / regulatory question…"
+                      className="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus-visible:outline-none"
+                      placeholder={t('chat.composerPlaceholder')}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={onComposerKeyDown}
@@ -244,10 +267,10 @@ export default function ChatPage() {
                     />
                     <button
                       type="submit"
-                      aria-label="Send message"
-                      title="Send (Enter)"
+                      aria-label={t('chat.send')}
+                      title={t('chat.send')}
                       disabled={!canSend}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-saffron text-white transition-colors hover:bg-saffron-deep disabled:bg-surface-border disabled:text-ink-faint"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-saffron text-white transition-colors hover:bg-saffron-deep disabled:bg-surface-border disabled:text-ink-faint"
                     >
                       <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
                         <path
@@ -260,10 +283,7 @@ export default function ChatPage() {
                       </svg>
                     </button>
                   </div>
-                  <p className="mt-1.5 px-2 text-xs text-ink-faint">
-                    Enter to send, Shift+Enter for a new line. Not official Ayush advice — confirm
-                    filings against source gazettes.
-                  </p>
+                  <p className="mt-1.5 px-2 text-xs text-ink-faint">{t('chat.composerHint')}</p>
                 </form>
               </div>
             </div>
@@ -281,74 +301,36 @@ export default function ChatPage() {
             </div>
           </aside>
         </div>
-
-        {/* Below lg there's no room for three independently-scrolling
-            columns, so history and guidance collapse into compact
-            <details> rows above the conversation instead of a 3-column
-            grid - escalation stays a direct action, not tucked away. */}
-        <div className="flex flex-col gap-3 lg:hidden">
-          <EscalateButton
-            emphasized={Boolean(latestAssistant?.escalate_recommended)}
-            disabled={session.status === 'sending'}
-            onEscalate={session.escalate}
-          />
-
-          <details className="gov-panel">
-            <summary className="cursor-pointer px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Chat history
-            </summary>
-            <div className="h-64 border-t border-surface-border p-3">
-              <ChatHistorySidebar
-                activeConversationId={session.conversationId}
-                onSelect={(id) => void session.loadConversation(id)}
-                onNewChat={session.startNewChat}
-                onDeleted={() => session.startNewChat()}
-                refreshKey={session.turns.length}
-              />
-            </div>
-          </details>
-
-          <details className="gov-panel">
-            <summary className="cursor-pointer px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              How this works &amp; corpus note
-            </summary>
-            <div className="flex flex-col gap-3 border-t border-surface-border p-3">
-              <GuidanceRail />
-              <CorpusNote />
-            </div>
-          </details>
-        </div>
       </div>
     </AppShell>
   )
 }
 
 function GuidanceRail() {
+  const { t } = useLanguage()
   return (
     <section className="gov-panel p-4 text-sm">
-      <h2 className="font-bold text-navy">How this works</h2>
+      <h2 className="font-bold text-forest">{t('chat.howWorksTitle')}</h2>
       <ol className="mt-2 list-decimal space-y-1 pl-4 text-ink-muted">
-        <li>Choose language &amp; jurisdiction</li>
-        <li>Describe the product</li>
-        <li>Answer any clarifying questions</li>
-        <li>Review classification, citations &amp; action plan</li>
-        <li>Escalate if confidence is low</li>
+        <li>{t('chat.how1')}</li>
+        <li>{t('chat.how2')}</li>
+        <li>{t('chat.how3')}</li>
+        <li>{t('chat.how4')}</li>
+        <li>{t('chat.how5')}</li>
       </ol>
-      <Link to="/classify" className="mt-3 inline-block text-sm font-semibold text-primary underline">
-        Not sure what category your product is? Use the classification wizard →
+      <Link to="/classify" className="mt-3 inline-block text-sm font-semibold text-saffron-deep underline">
+        {t('chat.classifyLink')}
       </Link>
     </section>
   )
 }
 
 function CorpusNote() {
+  const { t } = useLanguage()
   return (
     <section className="gov-panel p-4 text-xs text-ink-muted">
-      <p className="font-semibold text-ink">Corpus note</p>
-      <p className="mt-1">
-        Answers cite Wave A statutes, rules, treaties and selected case law. TKDL is
-        awareness-only (not retrieved). GRATK is signed, not yet in force.
-      </p>
+      <p className="font-semibold text-ink">{t('chat.corpusTitle')}</p>
+      <p className="mt-1">{t('chat.corpusBody')}</p>
     </section>
   )
 }

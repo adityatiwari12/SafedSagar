@@ -3,25 +3,7 @@ import { chatApi, ChatTurnResponse, JourneyStepId } from '../api/chatApi'
 import { conversationsApi } from '../api/conversationsApi'
 import { ApiError } from '../api/http'
 import { LanguageCode, isSupportedLanguage } from '../api/languages'
-
-const LANGUAGE_STORAGE_KEY = 'ipsakti.language'
-
-function loadStoredLanguage(): LanguageCode {
-  try {
-    const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
-    return (stored as LanguageCode) || 'en'
-  } catch {
-    return 'en' // localStorage can throw (private browsing, blocked storage) - fall back silently
-  }
-}
-
-function storeLanguage(lang: LanguageCode) {
-  try {
-    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
-  } catch {
-    // per-viewer convenience only - losing this is not worth surfacing an error for
-  }
-}
+import { useLanguage } from '../i18n/LanguageContext'
 
 export interface Turn {
   id: string
@@ -42,9 +24,9 @@ function nextTurnId() {
 }
 
 export function useChatSession(initialProduct?: ActiveProduct | null) {
+  const { language, setLanguage } = useLanguage()
   const [turns, setTurns] = useState<Turn[]>([])
   const [jurisdiction, setJurisdictionState] = useState<'india' | 'international'>('india')
-  const [language, setLanguageState] = useState<LanguageCode>(loadStoredLanguage)
   // Product dossier the conversation is currently scoped to - included as
   // productId on every turn sent while set, so the Case that turn creates
   // links back to the product. Dismissing it (see clearActiveProduct)
@@ -172,11 +154,6 @@ export function useChatSession(initialProduct?: ActiveProduct | null) {
     },
     [runTurn],
   )
-
-  const setLanguage = useCallback((lang: LanguageCode) => {
-    storeLanguage(lang)
-    setLanguageState(lang)
-  }, [])
 
   const escalate = useCallback(async () => {
     if (!conversationIdRef.current) return null

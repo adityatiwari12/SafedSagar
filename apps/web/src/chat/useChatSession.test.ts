@@ -1,11 +1,17 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { createElement, type ReactNode } from 'react'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { useChatSession } from './useChatSession'
 import { chatApi } from '../api/chatApi'
+import { LanguageProvider } from '../i18n/LanguageContext'
 
 vi.mock('../api/chatApi', () => ({
   chatApi: { sendTurn: vi.fn(), sendTurnStreaming: vi.fn(), escalate: vi.fn() },
 }))
+
+function wrapper(props: { children: ReactNode }) {
+  return createElement(LanguageProvider, null, props.children)
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -23,7 +29,7 @@ test('sendMessage appends a user turn then an assistant turn on success', async 
     escalate_recommended: false,
   })
 
-  const { result } = renderHook(() => useChatSession())
+  const { result } = renderHook(() => useChatSession(), { wrapper })
 
   await act(async () => {
     await result.current.sendMessage('ashwagandha patent question')
@@ -51,7 +57,7 @@ test('surfaces clarifying questions without a final answer-only flow', async () 
     escalate_recommended: false,
   })
 
-  const { result } = renderHook(() => useChatSession())
+  const { result } = renderHook(() => useChatSession(), { wrapper })
 
   await act(async () => {
     await result.current.sendMessage('vague product question')
@@ -74,7 +80,7 @@ test('changing jurisdiction re-sends the last user turn with the new jurisdictio
     escalate_recommended: false,
   })
 
-  const { result } = renderHook(() => useChatSession())
+  const { result } = renderHook(() => useChatSession(), { wrapper })
   await act(async () => {
     await result.current.sendMessage('ashwagandha patent question')
   })
@@ -103,7 +109,7 @@ test('includes the active product id on turns while a product is set, and stops 
     escalate_recommended: false,
   })
 
-  const { result } = renderHook(() => useChatSession())
+  const { result } = renderHook(() => useChatSession(), { wrapper })
 
   act(() => {
     result.current.setActiveProduct({ id: 'p1', name: 'Ashwagandha capsules' })

@@ -1,156 +1,23 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-
-const PERSONAS = [
-  {
-    title: 'Practitioners',
-    image: '/media-chyawanprash.webp',
-    copy: 'Clarify classical vs proprietary routes, documentation needs and regulatory framing before you advise or formulate.',
-  },
-  {
-    title: 'Researchers',
-    image: '/media-herbs-1.jpg',
-    copy: 'Map prior-art awareness, traditional-knowledge pointers and jurisdiction before you publish or file.',
-  },
-  {
-    title: 'AYUSH Startups & MSMEs',
-    image: '/media-ayurveda-3.jpg',
-    copy: 'Identify protection and compliance pathways while product and market choices are still inexpensive to change.',
-  },
-  {
-    title: 'Manufacturers',
-    image: '/media-herbs-2.jpg',
-    copy: 'Navigate AYUSH, FSSAI and IP requirements across product categories without mixing India and export rules.',
-  },
-  {
-    title: 'Cultivators',
-    image: '/media-herbs-1.jpg',
-    copy: 'Understand ABS and biological-resource obligations tied to cultivation, access and commercial supply.',
-  },
-  {
-    title: 'Exporters',
-    image: '/media-ayurveda-3.jpg',
-    copy: 'Separate domestic ABS/IP duties from destination-market frameworks before market entry.',
-  },
-] as const
-
-const PROTECT = ['Patents', 'Trademarks', 'GI', 'Copyright', 'Designs', 'Trade Secrets']
-const COMPLY = ['Ayurveda Regulation', 'Biodiversity', 'ABS', 'Traditional Knowledge', 'FSSAI']
-const EXPAND = ['International IP', 'PCT', 'WIPO', 'TRIPS', 'Country-specific requirements']
-
-const PROCESS = [
-  { n: '01', title: 'Ask', detail: 'Describe an invention, formulation or regulatory question.' },
-  { n: '02', title: 'Classify', detail: 'Identify product category, IP type and jurisdiction.' },
-  { n: '03', title: 'Retrieve', detail: 'Hybrid retrieval across statutes, rules, treaties and cases.' },
-  { n: '04', title: 'Verify', detail: 'Mechanical citation validation against retrieved chunks.' },
-  { n: '05', title: 'Guide', detail: 'Structured answer with confidence, limits and next steps.' },
-] as const
-
-const PIPELINE = [
-  'User',
-  'Question understanding',
-  'Product classification',
-  'Jurisdiction routing',
-  'Hybrid retrieval',
-  'Reasoning',
-  'Citation validation',
-  'Answer',
-]
-
-const LAYERS = [
-  {
-    n: '01',
-    title: 'Product classification',
-    body: 'Classical / Proprietary / New composition — sets which statute cluster is relevant.',
-  },
-  {
-    n: '02',
-    title: 'IP analysis',
-    body: 'Patent, GI, trademark or TK pathway — routed without conflating brand and patentability.',
-  },
-  {
-    n: '03',
-    title: 'Regulatory analysis',
-    body: 'AYUSH, FSSAI or drug framing — kept distinct from filing strategy.',
-  },
-  {
-    n: '04',
-    title: 'Biodiversity & ABS',
-    body: 'Biological resources and traditional-knowledge signals that may trigger NBA pathways.',
-  },
-  {
-    n: '05',
-    title: 'Evidence',
-    body: 'Law → section → source → citation — only claims supported by retrieved text survive.',
-  },
-] as const
-
-const CLAIMS = [
-  {
-    id: '1',
-    claim: 'Classical formulations may face specific patentability limitations.',
-    source: 'Patents Act, 1970',
-    section: 'Section 3(p)',
-    authority: 'Government of India',
-  },
-  {
-    id: '2',
-    claim: 'Commercial use of Indian biological resources can require NBA approval.',
-    source: 'Biological Diversity Act',
-    section: 'ABS pathway',
-    authority: 'National Biodiversity Authority',
-  },
-  {
-    id: '3',
-    claim: 'Ayurveda Aahara products follow FSSAI food rules — not drug claims by default.',
-    source: 'Ayurveda Aahara Regulations, 2022',
-    section: 'Food pathway',
-    authority: 'FSSAI',
-  },
-] as const
-
-const SCRIPTS = ['हिन्दी', 'English', 'मराठी', 'ગુજરાતી', 'বাংলা', 'தமிழ்', 'తెలుగు', 'ಕನ್ನಡ', 'മലയാളം', 'ਪੰਜਾਬੀ']
-
-const DOCS = [
-  { title: 'Acts & Rules', authority: 'IP India / NBA', type: 'Statute', jurisdiction: 'India', version: 'Corpus Wave A' },
-  { title: 'Regulations', authority: 'FSSAI / Ayush', type: 'Regulation', jurisdiction: 'India', version: '2022+' },
-  { title: 'Notifications', authority: 'Demo index', type: 'Notice', jurisdiction: 'India', version: 'DEMO' },
-  { title: 'International Frameworks', authority: 'WIPO / WTO / CBD', type: 'Treaty', jurisdiction: 'International', version: 'Curated' },
-  { title: 'Traditional Knowledge', authority: 'TK awareness', type: 'Pointer', jurisdiction: 'India', version: 'Non-retrieval' },
-  { title: 'Prior Art', authority: 'Corpus + registries', type: 'Guidance', jurisdiction: 'Both', version: 'MVP' },
-  { title: 'Official Registries', authority: 'IPO interfaces', type: 'Registry', jurisdiction: 'India', version: 'Pointers' },
-] as const
-
-const UPDATES = [
-  { date: '2026-09-15', category: 'Corpus', title: 'Wave A IP / ABS / treaty sources loaded for demonstration', demo: true },
-  { date: '2026-08-20', category: 'Product', title: 'Ask journey with citation validation available', demo: true },
-  { date: '2026-05-24', category: 'Treaty note', title: 'GRATK presented as signed, not yet in force', demo: true },
-] as const
-
-const SUGGESTIONS = [
-  'Can I patent a classical Ayurvedic formulation?',
-  'What IP protection fits my herbal brand?',
-  'Does my product trigger biodiversity / ABS considerations?',
-  'What should I consider before exporting?',
-]
+import { useLanguage } from '../i18n/LanguageContext'
+import { LANGUAGES } from '../api/languages'
 
 export function InnovationArc() {
-  const steps = ['Traditional knowledge', 'Formulation', 'Innovation', 'Intellectual property', 'Commercialisation']
+  const { t } = useLanguage()
+  const steps = [t('about.step1'), t('about.step2'), t('about.step3'), t('about.step4'), t('about.step5')]
   return (
-    <section id="about" className="bg-ivory py-20 lg:py-28">
+    <section id="about" className="scroll-mt-28 bg-ivory py-20 lg:py-28">
       <div className="mx-auto grid max-w-portal gap-12 px-4 lg:grid-cols-12 lg:gap-10 lg:px-8">
         <div className="lg:col-span-7">
           <h2 className="text-section text-forest">
-            From Ayurveda knowledge
+            {t('about.title1')}
             <br />
-            to responsible innovation.
+            {t('about.title2')}
           </h2>
-          <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-muted">
-            Ayurveda sits where living traditional knowledge, biological resources and modern
-            products meet. Those intersections create interlocking IP and regulatory duties.
-          </p>
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-muted">{t('about.body')}</p>
           <p className="mt-8 max-w-xl border-l-4 border-saffron bg-white px-5 py-4 text-lg font-semibold leading-snug text-forest">
-            IP-SAKTI connects the legal, regulatory and knowledge layers behind Ayurveda innovation.
+            {t('about.callout')}
           </p>
         </div>
         <div className="relative lg:col-span-5">
@@ -181,15 +48,23 @@ export function InnovationArc() {
 }
 
 export function Personas() {
+  const { t } = useLanguage()
+  const personas = [
+    { title: t('personas.p1title'), image: '/media-chyawanprash.webp', copy: t('personas.p1copy') },
+    { title: t('personas.p2title'), image: '/media-herbs-1.jpg', copy: t('personas.p2copy') },
+    { title: t('personas.p3title'), image: '/media-ayurveda-3.jpg', copy: t('personas.p3copy') },
+    { title: t('personas.p4title'), image: '/media-herbs-2.jpg', copy: t('personas.p4copy') },
+    { title: t('personas.p5title'), image: '/media-herbs-1.jpg', copy: t('personas.p5copy') },
+    { title: t('personas.p6title'), image: '/media-ayurveda-3.jpg', copy: t('personas.p6copy') },
+  ]
+
   return (
     <section className="bg-white py-20 lg:py-28">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
-        <h2 className="text-section text-forest">Who is IP-SAKTI for?</h2>
-        <p className="mt-4 max-w-2xl text-lg text-ink-muted">
-          One citizen-facing service covering the people who move Ayurveda from knowledge to market.
-        </p>
+        <h2 className="text-section text-forest">{t('personas.title')}</h2>
+        <p className="mt-4 max-w-2xl text-lg text-ink-muted">{t('personas.blurb')}</p>
         <div className="mt-14 space-y-12">
-          {PERSONAS.map((p, i) => {
+          {personas.map((p, i) => {
             const reverse = i % 2 === 1
             return (
               <article
@@ -208,7 +83,7 @@ export function Personas() {
                 <div className="flex flex-col justify-center bg-ivory px-6 py-10 lg:col-span-7 lg:px-12">
                   <p className="max-w-xl text-lg leading-relaxed text-ink-muted sm:text-xl">{p.copy}</p>
                   <Link to="/ask" className="gov-btn-primary mt-8 w-fit">
-                    Ask for this context
+                    {t('personas.askContext')}
                   </Link>
                 </div>
               </article>
@@ -221,24 +96,48 @@ export function Personas() {
 }
 
 export function ServiceGroups() {
+  const { t } = useLanguage()
+  const protect = [
+    t('services.patents'),
+    t('services.trademarks'),
+    t('services.gi'),
+    t('services.copyright'),
+    t('services.designs'),
+    t('services.tradeSecrets'),
+  ]
+  const comply = [
+    t('services.ayurvedaReg'),
+    t('services.biodiversity'),
+    t('services.abs'),
+    t('services.tk'),
+    t('services.fssai'),
+  ]
+  const expand = [
+    t('services.intlIp'),
+    t('services.pct'),
+    t('services.wipo'),
+    t('services.trips'),
+    t('services.countrySpecific'),
+  ]
+
   return (
-    <section id="services" className="bg-ivory py-20 lg:py-28">
+    <section id="services" className="scroll-mt-28 bg-ivory py-20 lg:py-28">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
-        <h2 className="text-section text-forest">What can IP-SAKTI help navigate?</h2>
+        <h2 className="text-section text-forest">{t('services.title')}</h2>
         <div className="mt-14 grid gap-6 lg:grid-cols-12">
           <div className="relative overflow-hidden bg-forest p-8 text-white lg:col-span-6 lg:min-h-[420px] lg:p-10">
             <img src="/media-herbs-1.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
             <div className="relative">
-              <p className="text-sm font-extrabold tracking-[0.16em] text-gold-soft">Protect</p>
-              <h3 className="mt-3 text-4xl font-extrabold sm:text-5xl">IP that holds</h3>
+              <p className="text-sm font-extrabold tracking-[0.16em] text-gold-soft">{t('services.protect')}</p>
+              <h3 className="mt-3 text-4xl font-extrabold sm:text-5xl">{t('services.protectTitle')}</h3>
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-                {PROTECT.map((t) => (
-                  <li key={t}>
+                {protect.map((item) => (
+                  <li key={item}>
                     <Link
                       to="/ask"
                       className="block border border-white/20 bg-white/5 px-4 py-3 text-base font-bold hover:bg-white/15"
                     >
-                      {t}
+                      {item}
                     </Link>
                   </li>
                 ))}
@@ -247,26 +146,32 @@ export function ServiceGroups() {
           </div>
           <div className="grid gap-6 lg:col-span-6">
             <div className="border border-surface-border bg-white p-7">
-              <p className="text-sm font-extrabold tracking-[0.16em] text-saffron-deep">Comply</p>
-              <h3 className="mt-2 text-2xl font-extrabold text-forest sm:text-3xl">Regulatory & ABS</h3>
+              <p className="text-sm font-extrabold tracking-[0.16em] text-saffron-deep">{t('services.comply')}</p>
+              <h3 className="mt-2 text-2xl font-extrabold text-forest sm:text-3xl">{t('services.complyTitle')}</h3>
               <ul className="mt-5 flex flex-wrap gap-2">
-                {COMPLY.map((t) => (
-                  <li key={t}>
-                    <Link to="/ask" className="inline-block border border-surface-border bg-ivory px-3 py-2 text-sm font-semibold text-ink hover:border-saffron">
-                      {t}
+                {comply.map((item) => (
+                  <li key={item}>
+                    <Link
+                      to="/ask"
+                      className="inline-block border border-surface-border bg-ivory px-3 py-2 text-sm font-semibold text-ink hover:border-saffron"
+                    >
+                      {item}
                     </Link>
                   </li>
                 ))}
               </ul>
             </div>
             <div className="border border-surface-border bg-navy p-7 text-white">
-              <p className="text-sm font-extrabold tracking-[0.16em] text-gold-soft">Expand</p>
-              <h3 className="mt-2 text-2xl font-extrabold sm:text-3xl">International track</h3>
+              <p className="text-sm font-extrabold tracking-[0.16em] text-gold-soft">{t('services.expand')}</p>
+              <h3 className="mt-2 text-2xl font-extrabold sm:text-3xl">{t('services.expandTitle')}</h3>
               <ul className="mt-5 flex flex-wrap gap-2">
-                {EXPAND.map((t) => (
-                  <li key={t}>
-                    <Link to="/ask" className="inline-block border border-white/25 bg-white/5 px-3 py-2 text-sm font-semibold hover:bg-white/15">
-                      {t}
+                {expand.map((item) => (
+                  <li key={item}>
+                    <Link
+                      to="/ask"
+                      className="inline-block border border-white/25 bg-white/5 px-3 py-2 text-sm font-semibold hover:bg-white/15"
+                    >
+                      {item}
                     </Link>
                   </li>
                 ))}
@@ -280,14 +185,33 @@ export function ServiceGroups() {
 }
 
 export function HowItWorks() {
+  const { t } = useLanguage()
+  const process = [
+    { n: '01', title: t('how.ask'), detail: t('how.askDetail') },
+    { n: '02', title: t('how.classify'), detail: t('how.classifyDetail') },
+    { n: '03', title: t('how.retrieve'), detail: t('how.retrieveDetail') },
+    { n: '04', title: t('how.verify'), detail: t('how.verifyDetail') },
+    { n: '05', title: t('how.guide'), detail: t('how.guideDetail') },
+  ]
+  const pipeline = [
+    t('how.pipeUser'),
+    t('how.pipeUnderstand'),
+    t('how.pipeProduct'),
+    t('how.pipeJurisdiction'),
+    t('how.pipeRetrieve'),
+    t('how.pipeReason'),
+    t('how.pipeCite'),
+    t('how.pipeAnswer'),
+  ]
+
   return (
     <section className="bg-white py-20 lg:py-28">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
-        <h2 className="text-section text-forest">How the system works</h2>
+        <h2 className="text-section text-forest">{t('how.title')}</h2>
         <div className="relative mt-14">
           <div className="absolute left-0 right-0 top-7 hidden h-0.5 bg-saffron md:block" aria-hidden="true" />
           <ol className="grid gap-8 md:grid-cols-5">
-            {PROCESS.map((s) => (
+            {process.map((s) => (
               <li key={s.n} className="relative">
                 <span className="relative z-10 inline-block h-3.5 w-3.5 rounded-full border-2 border-saffron bg-white" />
                 <p className="mt-5 text-4xl font-extrabold text-ivory-deep" style={{ WebkitTextStroke: '1.25px #0A3D2E33' }}>
@@ -300,12 +224,16 @@ export function HowItWorks() {
           </ol>
         </div>
         <div className="mt-14 overflow-x-auto border border-surface-border bg-ivory p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink-faint">Under the journey</p>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink-faint">{t('how.underJourney')}</p>
           <ol className="mt-4 flex min-w-max items-center gap-2 text-sm font-semibold text-forest">
-            {PIPELINE.map((p, i) => (
+            {pipeline.map((p, i) => (
               <li key={p} className="flex items-center gap-2">
                 <span className="whitespace-nowrap bg-white px-3 py-2">{p}</span>
-                {i < PIPELINE.length - 1 && <span className="text-saffron" aria-hidden="true">↓</span>}
+                {i < pipeline.length - 1 && (
+                <span className="text-saffron" aria-hidden="true">
+                    →
+                  </span>
+                )}
               </li>
             ))}
           </ol>
@@ -317,21 +245,30 @@ export function HowItWorks() {
 
 export function FiveLayers() {
   const [active, setActive] = useState(0)
+  const { t } = useLanguage()
+  const layers = [
+    { n: '01', title: t('layers.l1title'), body: t('layers.l1body') },
+    { n: '02', title: t('layers.l2title'), body: t('layers.l2body') },
+    { n: '03', title: t('layers.l3title'), body: t('layers.l3body') },
+    { n: '04', title: t('layers.l4title'), body: t('layers.l4body') },
+    { n: '05', title: t('layers.l5title'), body: t('layers.l5body') },
+  ]
+
   return (
     <section className="relative overflow-hidden bg-forest py-20 text-white lg:py-28">
       <img src="/media-herbs-2.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-20" />
       <div className="relative mx-auto max-w-portal px-4 lg:px-8">
         <h2 className="text-section text-white">
-          One question.
+          {t('layers.title1')}
           <br />
-          Five layers of intelligence.
+          {t('layers.title2')}
         </h2>
         <p className="mt-5 max-w-2xl border-l-4 border-saffron bg-black/20 px-5 py-4 text-lg text-white/90">
-          “Can I commercialize this Ayurvedic formulation?”
+          {t('layers.sampleQ')}
         </p>
         <div className="mt-12 grid gap-6 lg:grid-cols-12">
           <ol className="space-y-2 lg:col-span-5">
-            {LAYERS.map((l, i) => (
+            {layers.map((l, i) => (
               <li key={l.n}>
                 <button
                   type="button"
@@ -348,12 +285,12 @@ export function FiveLayers() {
           </ol>
           <div className="border border-white/20 bg-white p-8 text-ink lg:col-span-7">
             <p className="text-xs font-extrabold tracking-[0.16em] text-saffron-deep">
-              Layer {LAYERS[active].n}
+              {t('layers.layerLabel')} {layers[active].n}
             </p>
-            <h3 className="mt-3 text-3xl font-extrabold text-forest">{LAYERS[active].title}</h3>
-            <p className="mt-4 text-lg leading-relaxed text-ink-muted">{LAYERS[active].body}</p>
+            <h3 className="mt-3 text-3xl font-extrabold text-forest">{layers[active].title}</h3>
+            <p className="mt-4 text-lg leading-relaxed text-ink-muted">{layers[active].body}</p>
             <Link to="/ask" className="gov-btn-primary mt-8 inline-flex">
-              Run this question in Ask
+              {t('layers.runAsk')}
             </Link>
           </div>
         </div>
@@ -364,19 +301,43 @@ export function FiveLayers() {
 
 export function SourceGrounded() {
   const [id, setId] = useState('1')
-  const active = CLAIMS.find((c) => c.id === id) ?? CLAIMS[0]
+  const { t } = useLanguage()
+  const claims = [
+    {
+      id: '1',
+      claim: t('sources.c1'),
+      source: t('sources.c1source'),
+      section: t('sources.c1section'),
+      authority: t('sources.c1authority'),
+    },
+    {
+      id: '2',
+      claim: t('sources.c2'),
+      source: t('sources.c2source'),
+      section: t('sources.c2section'),
+      authority: t('sources.c2authority'),
+    },
+    {
+      id: '3',
+      claim: t('sources.c3'),
+      source: t('sources.c3source'),
+      section: t('sources.c3section'),
+      authority: t('sources.c3authority'),
+    },
+  ]
+  const active = claims.find((c) => c.id === id) ?? claims[0]
 
   return (
-    <section id="sources" className="bg-forest py-20 text-white lg:py-28">
+    <section id="sources" className="scroll-mt-28 bg-forest py-20 text-white lg:py-28">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
         <h2 className="text-section text-white">
-          AI that shows you where
+          {t('sources.title1')}
           <br />
-          the answer comes from.
+          {t('sources.title2')}
         </h2>
         <div className="mt-14 grid gap-10 lg:grid-cols-12 lg:items-start">
           <div className="space-y-3 lg:col-span-6">
-            {CLAIMS.map((c) => (
+            {claims.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -402,21 +363,21 @@ export function SourceGrounded() {
               <path className="evidence-line" d="M0 40 H32" />
             </svg>
             <aside className="border border-white/20 bg-white p-7 text-ink shadow-lift">
-              <p className="text-xs font-extrabold tracking-[0.16em] text-saffron-deep">Claim → Source</p>
+              <p className="text-xs font-extrabold tracking-[0.16em] text-saffron-deep">{t('sources.claimSource')}</p>
               <p className="mt-4 text-lg font-semibold leading-snug text-ink">{active.claim}</p>
               <div className="mt-6 border-t border-surface-border pt-5">
-                <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">Supporting source</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">{t('sources.supporting')}</p>
                 <p className="mt-2 text-2xl font-extrabold text-forest">{active.source}</p>
                 <p className="text-base font-semibold text-ink-muted">{active.section}</p>
                 <p className="mt-1 text-sm text-ink-faint">{active.authority}</p>
                 <Link to="/ask" className="mt-5 inline-block text-sm font-extrabold text-saffron-deep underline">
-                  Open in Ask with this focus
+                  {t('sources.openAsk')}
                 </Link>
               </div>
             </aside>
             <ul className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-white/80">
               <li className="border border-white/25 px-3 py-1.5">WIPO</li>
-              <li className="border border-white/25 px-3 py-1.5">Ministry of Ayush</li>
+              <li className="border border-white/25 px-3 py-1.5">{t('common.ministryAyush')}</li>
               <li className="border border-white/25 px-3 py-1.5">National Biodiversity Authority</li>
             </ul>
           </div>
@@ -427,41 +388,59 @@ export function SourceGrounded() {
 }
 
 export function JurisdictionSplit() {
+  const { t } = useLanguage()
+  const india = [
+    t('jurisdiction.patents'),
+    t('jurisdiction.gi'),
+    t('jurisdiction.trademarks'),
+    t('jurisdiction.ayush'),
+    t('jurisdiction.biodiversityAbs'),
+    t('jurisdiction.fssai'),
+    t('jurisdiction.tk'),
+  ]
+  const intl = [
+    t('jurisdiction.wipo'),
+    t('jurisdiction.trips'),
+    t('jurisdiction.pct'),
+    t('jurisdiction.cbd'),
+    t('jurisdiction.nagoya'),
+    t('jurisdiction.foreignIp'),
+    t('jurisdiction.marketReg'),
+  ]
+
   return (
-    <section id="ip-ayurveda" className="bg-ivory">
+    <section id="ip-ayurveda" className="scroll-mt-28 bg-ivory">
       <div className="mx-auto grid max-w-portal lg:grid-cols-[1fr_auto_1fr]">
         <div className="border-b border-surface-border px-6 py-16 lg:border-b-0 lg:border-r lg:px-10 lg:py-24">
-          <p className="text-sm font-extrabold tracking-[0.16em] text-saffron-deep">India</p>
-          <h2 className="mt-3 text-4xl font-extrabold text-forest sm:text-5xl">Domestic track</h2>
+          <p className="text-sm font-extrabold tracking-[0.16em] text-saffron-deep">{t('jurisdiction.india')}</p>
+          <h2 className="mt-3 text-4xl font-extrabold text-forest sm:text-5xl">{t('jurisdiction.domestic')}</h2>
           <ul className="mt-8 space-y-3 text-lg text-ink-muted">
-            {['Patents', 'GI', 'Trademarks', 'AYUSH', 'Biodiversity / ABS', 'FSSAI', 'Traditional Knowledge'].map(
-              (t) => (
-                <li key={t} className="flex items-center gap-3">
-                  <span className="h-px w-8 bg-saffron" />
-                  {t}
-                </li>
-              ),
-            )}
+            {india.map((item) => (
+              <li key={item} className="flex items-center gap-3">
+                <span className="h-px w-8 bg-saffron" />
+                {item}
+              </li>
+            ))}
           </ul>
         </div>
         <div className="flex items-center justify-center bg-navy px-6 py-12 text-center text-white lg:min-w-[12rem]">
           <div>
-            <p className="text-[11px] font-extrabold tracking-[0.18em] text-gold-soft">Jurisdiction-aware</p>
-            <p className="mt-2 text-3xl font-extrabold leading-none">Routing</p>
+            <p className="text-[11px] font-extrabold tracking-[0.18em] text-gold-soft">
+              {t('jurisdiction.routingKicker')}
+            </p>
+            <p className="mt-2 text-3xl font-extrabold leading-none">{t('jurisdiction.routing')}</p>
           </div>
         </div>
         <div className="px-6 py-16 lg:px-10 lg:py-24">
-          <p className="text-sm font-extrabold tracking-[0.16em] text-forest-mid">International</p>
-          <h2 className="mt-3 text-4xl font-extrabold text-forest sm:text-5xl">Global track</h2>
+          <p className="text-sm font-extrabold tracking-[0.16em] text-forest-mid">{t('jurisdiction.international')}</p>
+          <h2 className="mt-3 text-4xl font-extrabold text-forest sm:text-5xl">{t('jurisdiction.global')}</h2>
           <ul className="mt-8 space-y-3 text-lg text-ink-muted">
-            {['WIPO', 'TRIPS', 'PCT', 'CBD', 'Nagoya Protocol', 'Foreign IP offices', 'Market-specific regulation'].map(
-              (t) => (
-                <li key={t} className="flex items-center gap-3">
-                  <span className="h-px w-8 bg-forest-mid" />
-                  {t}
-                </li>
-              ),
-            )}
+            {intl.map((item) => (
+              <li key={item} className="flex items-center gap-3">
+                <span className="h-px w-8 bg-forest-mid" />
+                {item}
+              </li>
+            ))}
           </ul>
         </div>
       </div>
@@ -470,27 +449,30 @@ export function JurisdictionSplit() {
 }
 
 export function Multilingual() {
+  const { t, language, setLanguage } = useLanguage()
   return (
     <section className="bg-white py-20 lg:py-28">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
-        <h2 className="text-section text-forest">Knowledge should not be limited by language.</h2>
-        <p className="mt-4 max-w-2xl text-lg text-ink-muted">
-          English is available now. Scripts below show the intended multilingual surface for future
-          BHASHINI integration — we do not claim live support for all languages yet.
-        </p>
+        <h2 className="text-section text-forest">{t('multilingual.title')}</h2>
+        <p className="mt-4 max-w-2xl text-lg text-ink-muted">{t('multilingual.body')}</p>
         <div className="mt-12 flex flex-wrap gap-x-6 gap-y-5">
-          {SCRIPTS.map((s) => (
-            <span
-              key={s}
-              className={`font-hindi leading-none ${
-                s === 'English' ? 'text-5xl font-extrabold text-saffron-deep sm:text-6xl' : 'text-3xl font-semibold text-forest/70 sm:text-4xl'
+          {LANGUAGES.map((lang) => (
+            <button
+              key={lang.code}
+              type="button"
+              lang={lang.code}
+              onClick={() => setLanguage(lang.code)}
+              className={`leading-none transition-colors ${
+                language === lang.code
+                  ? 'text-5xl font-extrabold text-saffron-deep sm:text-6xl'
+                  : 'text-3xl font-semibold text-forest/70 hover:text-forest sm:text-4xl'
               }`}
-              lang={s === 'English' ? 'en' : undefined}
             >
-              {s}
-            </span>
+              {lang.nativeName}
+            </button>
           ))}
         </div>
+        <p className="mt-6 text-sm font-semibold text-forest-mid">{t('langCard.poweredBy')}</p>
       </div>
     </section>
   )
@@ -499,10 +481,12 @@ export function Multilingual() {
 export function AskImmersive() {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
+  const { t } = useLanguage()
+  const suggestions = useMemo(() => [t('ask.s1'), t('ask.s2'), t('ask.s3'), t('ask.s4')], [t])
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
-    navigate('/ask', { state: { prefill: q || SUGGESTIONS[0] } })
+    navigate('/ask', { state: { seededDraft: q || suggestions[0] } })
   }
 
   return (
@@ -515,27 +499,27 @@ export function AskImmersive() {
       }}
     >
       <div className="mx-auto max-w-portal px-4 lg:px-8">
-        <h2 className="text-section text-white">Ask a question.</h2>
+        <h2 className="text-section text-white">{t('ask.title')}</h2>
         <form onSubmit={onSubmit} className="mt-10">
           <div className="flex flex-col gap-3 border border-white/20 bg-white p-3 sm:flex-row">
             <input
               className="min-h-[56px] flex-1 border-0 bg-transparent px-3 text-base outline-none"
-              placeholder="Describe your formulation, invention or regulatory question…"
+              placeholder={t('ask.placeholder')}
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
             <button type="submit" className="gov-btn-primary !px-8">
-              Ask IP-SAKTI
+              {t('common.askIpsakti')}
             </button>
           </div>
         </form>
         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <li key={s}>
               <button
                 type="button"
                 className="w-full px-1 py-2 text-left text-sm text-white/80 underline-offset-2 hover:text-white hover:underline"
-                onClick={() => navigate('/ask', { state: { prefill: s } })}
+                onClick={() => navigate('/ask', { state: { seededDraft: s } })}
               >
                 {s}
               </button>
@@ -548,29 +532,84 @@ export function AskImmersive() {
 }
 
 export function KnowledgeCentre() {
+  const { t } = useLanguage()
+  const docs = [
+    {
+      title: t('knowledge.d1title'),
+      authority: t('knowledge.d1authority'),
+      type: t('knowledge.d1type'),
+      jurisdiction: t('knowledge.d1jurisdiction'),
+      version: t('knowledge.d1version'),
+    },
+    {
+      title: t('knowledge.d2title'),
+      authority: t('knowledge.d2authority'),
+      type: t('knowledge.d2type'),
+      jurisdiction: t('knowledge.d2jurisdiction'),
+      version: t('knowledge.d2version'),
+    },
+    {
+      title: t('knowledge.d3title'),
+      authority: t('knowledge.d3authority'),
+      type: t('knowledge.d3type'),
+      jurisdiction: t('knowledge.d3jurisdiction'),
+      version: t('knowledge.d3version'),
+    },
+    {
+      title: t('knowledge.d4title'),
+      authority: t('knowledge.d4authority'),
+      type: t('knowledge.d4type'),
+      jurisdiction: t('knowledge.d4jurisdiction'),
+      version: t('knowledge.d4version'),
+    },
+    {
+      title: t('knowledge.d5title'),
+      authority: t('knowledge.d5authority'),
+      type: t('knowledge.d5type'),
+      jurisdiction: t('knowledge.d5jurisdiction'),
+      version: t('knowledge.d5version'),
+    },
+    {
+      title: t('knowledge.d6title'),
+      authority: t('knowledge.d6authority'),
+      type: t('knowledge.d6type'),
+      jurisdiction: t('knowledge.d6jurisdiction'),
+      version: t('knowledge.d6version'),
+    },
+    {
+      title: t('knowledge.d7title'),
+      authority: t('knowledge.d7authority'),
+      type: t('knowledge.d7type'),
+      jurisdiction: t('knowledge.d7jurisdiction'),
+      version: t('knowledge.d7version'),
+    },
+  ]
+
   return (
-    <section id="knowledge" className="bg-ivory py-20 lg:py-28">
+    <section id="knowledge" className="scroll-mt-28 bg-ivory py-20 lg:py-28">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
-        <h2 className="text-section text-forest">Knowledge Centre</h2>
-        <p className="mt-4 max-w-2xl text-lg text-ink-muted">
-          Document-library view of materials Sahayak can cite from the curated corpus.
-        </p>
+        <h2 className="text-section text-forest">{t('knowledge.title')}</h2>
+        <p className="mt-4 max-w-2xl text-lg text-ink-muted">{t('knowledge.blurb')}</p>
         <div className="mt-12 overflow-hidden border border-surface-border bg-white">
           <div className="hidden grid-cols-[1.4fr_1fr_0.8fr_0.8fr_0.7fr] gap-3 bg-forest px-5 py-3 text-[11px] font-extrabold uppercase tracking-wide text-white/80 md:grid">
-            <span>Collection</span>
-            <span>Authority</span>
-            <span>Type</span>
-            <span>Jurisdiction</span>
-            <span>Version</span>
+            <span>{t('knowledge.collection')}</span>
+            <span>{t('knowledge.authority')}</span>
+            <span>{t('knowledge.type')}</span>
+            <span>{t('knowledge.jurisdiction')}</span>
+            <span>{t('knowledge.version')}</span>
           </div>
           <ul>
-            {DOCS.map((d) => (
+            {docs.map((d) => (
               <li
                 key={d.title}
+                data-knowledge-row
                 className="grid items-center gap-2 border-b border-surface-border px-5 py-5 last:border-0 md:grid-cols-[1.4fr_1fr_0.8fr_0.8fr_0.7fr]"
               >
                 <div className="flex items-center gap-3">
-                  <div className="hidden h-14 w-10 flex-col justify-between border border-surface-border bg-ivory p-1 sm:flex" aria-hidden="true">
+                  <div
+                    className="hidden h-14 w-10 flex-col justify-between border border-surface-border bg-ivory p-1 sm:flex"
+                    aria-hidden="true"
+                  >
                     <div className="h-1 bg-forest/20" />
                     <div className="space-y-0.5">
                       <div className="h-0.5 bg-forest/15" />
@@ -580,7 +619,7 @@ export function KnowledgeCentre() {
                   <div>
                     <p className="font-extrabold text-forest">{d.title}</p>
                     <Link to="/ask" className="text-xs font-bold text-saffron-deep underline">
-                      View in Ask
+                      {t('knowledge.viewInAsk')}
                     </Link>
                   </div>
                 </div>
@@ -598,20 +637,27 @@ export function KnowledgeCentre() {
 }
 
 export function LatestUpdates() {
+  const { t } = useLanguage()
+  const updates = [
+    { date: '2026-09-15', category: t('updates.u1cat'), title: t('updates.u1title'), demo: true },
+    { date: '2026-08-20', category: t('updates.u2cat'), title: t('updates.u2title'), demo: true },
+    { date: '2026-05-24', category: t('updates.u3cat'), title: t('updates.u3title'), demo: true },
+  ]
+
   return (
     <section className="bg-white py-16 lg:py-20">
       <div className="mx-auto max-w-portal px-4 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-3xl font-extrabold text-forest sm:text-4xl">Latest updates</h2>
-          <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">Demo timeline — not gazette notices</p>
+          <h2 className="text-3xl font-extrabold text-forest sm:text-4xl">{t('updates.title')}</h2>
+          <p className="text-xs font-bold uppercase tracking-wide text-ink-faint">{t('updates.demoNote')}</p>
         </div>
         <ol className="mt-10 space-y-0 border-l-2 border-saffron/40">
-          {UPDATES.map((u) => (
+          {updates.map((u) => (
             <li key={u.title} className="relative py-5 pl-8">
               <span className="absolute -left-[5px] top-7 h-2.5 w-2.5 rounded-full bg-saffron" />
               <p className="text-xs font-extrabold tracking-[0.14em] text-saffron-deep">
                 {u.date} · {u.category}
-                {u.demo ? ' · DEMO' : ''}
+                {u.demo ? ` · ${t('updates.demo')}` : ''}
               </p>
               <p className="mt-2 text-lg font-semibold text-ink">{u.title}</p>
             </li>
@@ -623,31 +669,28 @@ export function LatestUpdates() {
 }
 
 export function DisclaimerFaq() {
+  const { t } = useLanguage()
   return (
     <>
-      <section id="disclaimer" className="border-y border-surface-border bg-ivory py-14">
+      <section id="disclaimer" className="scroll-mt-28 border-y border-surface-border bg-ivory py-14">
         <div className="mx-auto max-w-portal px-4 lg:px-8">
-          <h2 className="text-2xl font-extrabold text-forest">Disclaimer</h2>
-          <p className="mt-4 max-w-3xl text-base leading-relaxed text-ink-muted">
-            IP-SAKTI Sahayak provides information and decision-support based on available
-            authoritative sources. It does not provide legal advice and does not replace qualified
-            legal or regulatory professionals.
-          </p>
+          <h2 className="text-2xl font-extrabold text-forest">{t('disclaimer.title')}</h2>
+          <p className="mt-4 max-w-3xl text-base leading-relaxed text-ink-muted">{t('disclaimer.body')}</p>
         </div>
       </section>
-      <section id="faq" className="bg-white py-14">
+      <section id="faq" className="scroll-mt-28 bg-white py-14">
         <div className="mx-auto grid max-w-portal gap-8 px-4 md:grid-cols-3 lg:px-8">
           <div>
-            <h3 className="font-extrabold text-forest">Is this legal advice?</h3>
-            <p className="mt-2 text-sm text-ink-muted">No — cited information and decision-support only.</p>
+            <h3 className="font-extrabold text-forest">{t('disclaimer.q1')}</h3>
+            <p className="mt-2 text-sm text-ink-muted">{t('disclaimer.a1')}</p>
           </div>
           <div>
-            <h3 className="font-extrabold text-forest">Does it search TKDL?</h3>
-            <p className="mt-2 text-sm text-ink-muted">Awareness pointers only; contents are not retrieved.</p>
+            <h3 className="font-extrabold text-forest">{t('disclaimer.q2')}</h3>
+            <p className="mt-2 text-sm text-ink-muted">{t('disclaimer.a2')}</p>
           </div>
           <div>
-            <h3 className="font-extrabold text-forest">Mixed jurisdictions?</h3>
-            <p className="mt-2 text-sm text-ink-muted">Never. India and international stay on separate tracks.</p>
+            <h3 className="font-extrabold text-forest">{t('disclaimer.q3')}</h3>
+            <p className="mt-2 text-sm text-ink-muted">{t('disclaimer.a3')}</p>
           </div>
         </div>
       </section>

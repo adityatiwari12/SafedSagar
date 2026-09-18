@@ -35,6 +35,7 @@ export default {
           muted: '#F7F3EA',
           border: '#DDD5C4',
         },
+        line: '#DDD5C4',
         ayush: {
           DEFAULT: '#0F5C45',
           bright: '#138808',

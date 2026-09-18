@@ -2,30 +2,54 @@ import { FormEvent, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { StateEmblem } from '../layout/StateEmblem'
 import { useAuth } from '../auth/AuthContext'
+import { useLanguage } from '../i18n/LanguageContext'
+import { TopBarLanguageLinks } from '../i18n/LanguageSelectCard'
 
-const NAV = [
-  { href: '/', label: 'Home' },
-  { href: '#about', label: 'About' },
-  { href: '#services', label: 'Services' },
-  { href: '#ip-ayurveda', label: 'IP & Ayurveda' },
-  { href: '#sources', label: 'Sources' },
-  { href: '#faq', label: 'FAQ' },
+const OFFICIAL_LINKS = [
+  { label: 'Ministry of Ayush', href: 'https://ayush.gov.in/' },
+  { label: 'IP India', href: 'https://www.ipindia.gov.in/' },
+  { label: 'WIPO', href: 'https://www.wipo.int/' },
+  { label: 'National Biodiversity Authority', href: 'https://nbaindia.org/' },
+  { label: 'FSSAI', href: 'https://www.fssai.gov.in/' },
 ] as const
 
 export function PortalChrome({ children }: { children: ReactNode }) {
   const { status, logout, user } = useAuth()
+  const { t, language } = useLanguage()
   const [menuOpen, setMenuOpen] = useState(false)
   const [q, setQ] = useState('')
 
+  const NAV = [
+    { href: '/', label: t('nav.home') },
+    { href: '#about', label: t('nav.about') },
+    { href: '#services', label: t('nav.services') },
+    { href: '#ip-ayurveda', label: t('nav.ipAyurveda') },
+    { href: '#sources', label: t('nav.sources') },
+    { href: '#faq', label: t('nav.faq') },
+  ] as const
+
   function onSearch(e: FormEvent) {
     e.preventDefault()
-    document.getElementById('knowledge')?.scrollIntoView({ behavior: 'smooth' })
+    const target = document.getElementById('knowledge')
+    target?.scrollIntoView({ behavior: 'smooth' })
+    if (q.trim()) {
+      const cards = target?.querySelectorAll('[data-knowledge-row]')
+      cards?.forEach((row) => {
+        const el = row as HTMLElement
+        const hay = (el.textContent ?? '').toLowerCase()
+        el.hidden = !hay.includes(q.trim().toLowerCase())
+      })
+    } else {
+      target?.querySelectorAll('[data-knowledge-row]').forEach((row) => {
+        ;(row as HTMLElement).hidden = false
+      })
+    }
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-ivory">
+    <div className="flex min-h-screen flex-col bg-ivory" lang={language}>
       <a href="#main-content" className="skip-link">
-        Skip to main content
+        {t('common.skipToMain')}
       </a>
 
       <div className="bg-navy text-[11px] text-white sm:text-xs">
@@ -35,20 +59,17 @@ export function PortalChrome({ children }: { children: ReactNode }) {
               भारत सरकार
             </span>
             <span className="opacity-40">|</span>
-            <span>Government of India</span>
+            <span>{t('common.governmentOfIndia')}</span>
             <span className="opacity-40">|</span>
             <a href="#main-content" className="hover:underline">
-              Skip to Main Content
+              {t('common.skipToMain')}
             </a>
             <span className="opacity-40">|</span>
-            <span className="opacity-80">Screen Reader Access</span>
+            <a href="#disclaimer" className="opacity-90 hover:underline">
+              {t('common.screenReader')}
+            </a>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="font-hindi opacity-80" lang="hi">
-              हिन्दी
-            </span>
-            <span className="font-semibold">English</span>
-          </div>
+          <TopBarLanguageLinks />
         </div>
       </div>
 
@@ -64,9 +85,9 @@ export function PortalChrome({ children }: { children: ReactNode }) {
             <StateEmblem className="h-10 w-auto shrink-0 sm:h-11" />
             <div className="min-w-0 leading-tight">
               <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-ink-faint">
-                Ministry of Ayush
+                {t('common.ministryAyush')}
               </p>
-              <p className="text-[11px] text-ink-muted">Government of India</p>
+              <p className="text-[11px] text-ink-muted">{t('common.governmentOfIndia')}</p>
             </div>
           </div>
 
@@ -74,9 +95,7 @@ export function PortalChrome({ children }: { children: ReactNode }) {
             <Link to="/" className="text-lg font-extrabold tracking-tight text-forest">
               IP-SAKTI Sahayak
             </Link>
-            <p className="text-[11px] text-ink-muted">
-              Intellectual Property &amp; Regulatory Guidance for Ayurveda
-            </p>
+            <p className="text-[11px] text-ink-muted">{t('common.portalTagline')}</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -84,27 +103,36 @@ export function PortalChrome({ children }: { children: ReactNode }) {
               type="button"
               className="gov-btn-secondary !px-3 !py-2 lg:hidden"
               aria-expanded={menuOpen}
+              aria-controls="portal-primary-nav"
               onClick={() => setMenuOpen((v) => !v)}
             >
-              Menu
+              {t('common.menu')}
             </button>
+            {status !== 'authenticated' && (
+              <Link to="/login" className="hidden text-sm font-semibold text-forest sm:inline hover:underline">
+                {t('common.login')}
+              </Link>
+            )}
             <Link to="/ask" className="gov-btn-primary !px-4 !py-2 text-sm">
-              Ask IP-SAKTI
+              {t('common.askIpsakti')}
             </Link>
             {status === 'authenticated' && user && (
               <button type="button" className="hidden text-xs font-semibold text-ink-muted sm:inline" onClick={logout}>
-                Logout
+                {t('common.logout')}
               </button>
             )}
           </div>
         </div>
 
-        <div className={`border-t border-surface-border ${menuOpen ? 'block' : 'hidden'} lg:block`}>
+        <div
+          id="portal-primary-nav"
+          className={`border-t border-surface-border ${menuOpen ? 'block' : 'hidden'} lg:block`}
+        >
           <div className="mx-auto flex max-w-portal flex-col gap-2 px-4 py-1.5 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <nav aria-label="Primary">
+            <nav aria-label={t('nav.primary')}>
               <ul className="flex flex-col text-[14px] font-semibold text-ink lg:flex-row lg:flex-wrap lg:gap-1">
                 {NAV.map((item) => (
-                  <li key={item.label}>
+                  <li key={item.href}>
                     {item.href.startsWith('#') ? (
                       <a
                         href={item.href}
@@ -126,14 +154,14 @@ export function PortalChrome({ children }: { children: ReactNode }) {
                 ))}
               </ul>
             </nav>
-            <form onSubmit={onSearch} className="hidden md:block">
+            <form onSubmit={onSearch} className="block">
               <label htmlFor="portal-search" className="sr-only">
-                Search knowledge centre
+                {t('common.searchLabel')}
               </label>
               <input
                 id="portal-search"
-                className="gov-input !w-52 !py-1.5 !text-sm"
-                placeholder="Search knowledge centre…"
+                className="gov-input !w-full !py-1.5 !text-sm md:!w-52"
+                placeholder={t('common.searchPlaceholder')}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -151,57 +179,75 @@ export function PortalChrome({ children }: { children: ReactNode }) {
           <div className="flex gap-3">
             <StateEmblem className="h-12 w-auto brightness-0 invert" />
             <div>
-              <p className="font-bold">Ministry of Ayush</p>
+              <p className="font-bold">{t('common.ministryAyush')}</p>
               <p className="font-hindi text-sm text-white/75" lang="hi">
                 आयुष मंत्रालय
               </p>
-              <p className="text-sm text-white/75">Government of India</p>
+              <p className="text-sm text-white/75">{t('common.governmentOfIndia')}</p>
             </div>
           </div>
           <div className="text-sm">
-            <p className="font-bold">Important links</p>
+            <p className="font-bold">{t('footer.importantLinks')}</p>
             <ul className="mt-2 space-y-1 text-white/75">
-              <li>Ministry of Ayush</li>
-              <li>IP India</li>
-              <li>WIPO</li>
-              <li>National Biodiversity Authority</li>
-              <li>FSSAI</li>
+              {OFFICIAL_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
           <div className="text-sm">
-            <p className="font-bold">Portal</p>
+            <p className="font-bold">{t('footer.portal')}</p>
             <ul className="mt-2 space-y-1 text-white/75">
               <li>
                 <a href="#about" className="hover:underline">
-                  About
+                  {t('footer.about')}
                 </a>
               </li>
               <li>
                 <a href="#knowledge" className="hover:underline">
-                  Knowledge Centre
+                  {t('footer.knowledgeCentre')}
                 </a>
               </li>
               <li>
                 <a href="#faq" className="hover:underline">
-                  FAQ
+                  {t('footer.faq')}
                 </a>
               </li>
               <li>
                 <a href="#disclaimer" className="hover:underline">
-                  Disclaimer
+                  {t('footer.disclaimer')}
                 </a>
               </li>
             </ul>
           </div>
           <div className="text-sm text-white/75">
-            <p className="font-bold text-white">Legal</p>
+            <p className="font-bold text-white">{t('footer.legal')}</p>
             <ul className="mt-2 space-y-1">
-              <li>Accessibility</li>
-              <li>Privacy</li>
-              <li>Sitemap</li>
+              <li>
+                <a href="#disclaimer" className="hover:underline">
+                  {t('common.accessibility')}
+                </a>
+              </li>
+              <li>
+                <a href="#disclaimer" className="hover:underline">
+                  {t('common.privacy')}
+                </a>
+              </li>
+              <li>
+                <a href="#about" className="hover:underline">
+                  {t('common.sitemap')}
+                </a>
+              </li>
             </ul>
-            <p className="mt-4 text-xs text-gold-soft">SIH 2026 Prototype</p>
-            <p className="text-xs">Not an officially deployed Government of India service unless authorised.</p>
+            <p className="mt-4 text-xs text-gold-soft">{t('footer.notOfficial')}</p>
           </div>
         </div>
         <div className="tricolor-bar" aria-hidden="true">

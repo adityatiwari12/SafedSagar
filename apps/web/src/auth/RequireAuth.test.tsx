@@ -3,24 +3,27 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 import { RequireAuth } from './RequireAuth'
 import * as AuthContext from './AuthContext'
+import { LanguageProvider } from '../i18n/LanguageContext'
 
 function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/login" element={<div>login page</div>} />
-        <Route path="/placeholder" element={<div>placeholder page</div>} />
-        <Route path="/cases" element={<div>cases page</div>} />
-        <Route
-          path="/"
-          element={
-            <RequireAuth allow={['user']}>
-              <div>protected content</div>
-            </RequireAuth>
-          }
-        />
-      </Routes>
-    </MemoryRouter>,
+    <LanguageProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/login" element={<div>login page</div>} />
+          <Route path="/placeholder" element={<div>placeholder page</div>} />
+          <Route path="/cases" element={<div>cases page</div>} />
+          <Route
+            path="/"
+            element={
+              <RequireAuth allow={['user']}>
+                <div>protected content</div>
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    </LanguageProvider>,
   )
 }
 

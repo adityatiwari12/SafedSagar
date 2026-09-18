@@ -108,7 +108,7 @@ export function ChatHistorySidebar({
               disabled={deletingId === c.conversationId}
               aria-label={`Delete conversation: ${c.title}`}
               title="Delete conversation"
-              className="mr-1 mt-2 shrink-0 rounded-md px-1.5 py-0.5 text-xs text-ink-faint opacity-0 hover:bg-red-100 hover:text-red-700 focus:opacity-100 group-hover:opacity-100 disabled:opacity-50"
+              className="mr-1 mt-2 shrink-0 rounded-sm px-1.5 py-0.5 text-xs text-ink-faint opacity-100 hover:bg-red-100 hover:text-red-700 focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50"
             >
               ✕
             </button>

@@ -176,7 +176,13 @@ export default function RegisterPage() {
                 onChange={(e) => setConsentPrivacy(e.target.checked)}
                 required
               />
-              I have read and accept the Privacy Policy.
+              <span>
+                I have read and accept the{' '}
+                <Link to="/#disclaimer" className="font-semibold text-saffron-deep underline">
+                  Privacy Policy / Disclaimer
+                </Link>
+                .
+              </span>
             </label>
             <label className="flex items-start gap-2 text-xs text-ink-muted">
               <input
@@ -186,7 +192,13 @@ export default function RegisterPage() {
                 onChange={(e) => setConsentTerms(e.target.checked)}
                 required
               />
-              I have read and accept the Terms of Use.
+              <span>
+                I have read and accept the{' '}
+                <Link to="/#disclaimer" className="font-semibold text-saffron-deep underline">
+                  Terms of Use
+                </Link>
+                .
+              </span>
             </label>
             <label className="flex items-start gap-2 text-xs text-ink-muted">
               <input

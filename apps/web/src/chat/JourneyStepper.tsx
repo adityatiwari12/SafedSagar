@@ -1,4 +1,6 @@
 import { ChatTurnResponse, JourneyStepId } from '../api/chatApi'
+import { useLanguage } from '../i18n/LanguageContext'
+import type { MessageKey } from '../i18n/types'
 
 export type { JourneyStepId }
 
@@ -7,15 +9,15 @@ export type { JourneyStepId }
 // -> route_ip_type/retrieve/rerank -> reason_and_cite/validate_citations ->
 // score_confidence/escalate_if_needed), not an arbitrary UI-authored guess -
 // a live /chat/ws turn lights these up in exactly this left-to-right order.
-const STEPS: { id: JourneyStepId; label: string }[] = [
-  { id: 'language', label: 'Language' },
-  { id: 'understand', label: 'Understand' },
-  { id: 'classify', label: 'Classify' },
-  { id: 'jurisdiction', label: 'Jurisdiction' },
-  { id: 'need', label: 'Identify need' },
-  { id: 'abs', label: 'ABS / TK' },
-  { id: 'answer', label: 'Answer' },
-  { id: 'action', label: 'Action plan' },
+const STEP_KEYS: { id: JourneyStepId; labelKey: MessageKey }[] = [
+  { id: 'language', labelKey: 'chat.stepLanguage' },
+  { id: 'understand', labelKey: 'chat.stepUnderstand' },
+  { id: 'classify', labelKey: 'chat.stepClassify' },
+  { id: 'jurisdiction', labelKey: 'chat.stepJurisdiction' },
+  { id: 'need', labelKey: 'chat.stepNeed' },
+  { id: 'abs', labelKey: 'chat.stepAbs' },
+  { id: 'answer', labelKey: 'chat.stepAnswer' },
+  { id: 'action', labelKey: 'chat.stepAction' },
 ]
 
 export function deriveJourneyStep(opts: {
@@ -41,12 +43,13 @@ export function deriveJourneyStep(opts: {
 }
 
 export function JourneyStepper({ active }: { active: JourneyStepId }) {
-  const activeIndex = STEPS.findIndex((s) => s.id === active)
+  const { t } = useLanguage()
+  const activeIndex = STEP_KEYS.findIndex((s) => s.id === active)
 
   return (
-    <nav aria-label="Guidance journey" className="gov-panel overflow-x-auto p-3">
+    <nav aria-label={t('chat.journeyAria')} className="gov-panel overflow-x-auto p-3">
       <ol className="flex min-w-max gap-1">
-        {STEPS.map((step, i) => {
+        {STEP_KEYS.map((step, i) => {
           const done = i < activeIndex
           const current = i === activeIndex
           return (
@@ -68,9 +71,9 @@ export function JourneyStepper({ active }: { active: JourneyStepId }) {
                 >
                   {i + 1}
                 </span>
-                {step.label}
+                {t(step.labelKey)}
               </div>
-              {i < STEPS.length - 1 && (
+              {i < STEP_KEYS.length - 1 && (
                 <span className="px-0.5 text-ink-faint" aria-hidden="true">
                   ›
                 </span>
