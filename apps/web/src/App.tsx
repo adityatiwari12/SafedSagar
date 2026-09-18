@@ -9,6 +9,8 @@ import AdminPage from './pages/AdminPage'
 import ChatPage from './chat/ChatPage'
 import ClassificationWizard from './classify/ClassificationWizard'
 import LandingPage from './landing/LandingPage'
+import ProductsListPage from './products/ProductsListPage'
+import ProductDetailPage from './products/ProductDetailPage'
 
 export default function App() {
   return (
@@ -38,6 +40,22 @@ export default function App() {
           element={
             <RequireAuth allow={['user']}>
               <ClassificationWizard />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/products"
+          element={
+            <RequireAuth allow={['user']}>
+              <ProductsListPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/products/:id"
+          element={
+            <RequireAuth allow={['user']}>
+              <ProductDetailPage />
             </RequireAuth>
           }
         />
