@@ -8,18 +8,27 @@ export function MessageBubble({
   children: ReactNode
 }) {
   const isUser = role === 'user'
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-saffron px-4 py-2.5 text-sm leading-relaxed text-white shadow-panel">
+          {children}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className="flex justify-start gap-3">
       <div
-        className={`max-w-[min(100%,42rem)] rounded-sm px-4 py-3 text-sm leading-relaxed shadow-panel ${
-          isUser
-            ? 'bg-saffron text-white'
-            : 'border border-surface-border bg-white text-ink'
-        }`}
+        aria-hidden="true"
+        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest text-[0.7rem] font-bold text-white"
       >
-        <p className={`mb-1 text-xs font-bold uppercase tracking-wide ${isUser ? 'text-white/80' : 'text-ink-faint'}`}>
-          {isUser ? 'You' : 'Sahayak'}
-        </p>
+        S
+      </div>
+      <div className="min-w-0 max-w-[min(100%,44rem)] flex-1 text-sm leading-relaxed text-ink">
+        <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-faint">Sahayak</p>
         {children}
       </div>
     </div>

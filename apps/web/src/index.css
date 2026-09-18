@@ -198,6 +198,29 @@
     fill: none;
     stroke-dasharray: 6 4;
   }
+
+  /* Slim themed scrollbar for independently-scrolling chat panels
+     (history list, message thread) - default browser scrollbars read as
+     heavy/dated next to the rest of the chat surface. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--gold);
+  }
 }
 
 /* Hard fallbacks — Vite HMR has dropped custom theme utilities after CSS errors */
