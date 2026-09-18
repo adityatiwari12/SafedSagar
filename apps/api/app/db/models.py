@@ -591,3 +591,47 @@ class ExpertReview(Base):
 
     case: Mapped["Case"] = relationship()
     reviewer: Mapped["User"] = relationship()
+
+
+class Product(Base):
+    """A product/formulation dossier (spec Section 6, Phase 3) - the
+    ownership+org-scoped record a User builds up IP/regulatory/ABS
+    context on. Access follows app.authz.service.can_access_resource:
+    owner_user_id OR organization_id membership - no separate
+    assigned_to_user_id/visibility axis for this entity (unlike Case/TK)."""
+
+    __tablename__ = "products"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
+
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    # One of app.graph.state.PRODUCT_CATEGORIES, validated at the router.
+    product_classification: Mapped[str | None] = mapped_column(String, nullable=True)
+    jurisdiction: Mapped[str | None] = mapped_column(String, nullable=True)
+    intended_use: Mapped[str | None] = mapped_column(String, nullable=True)
+    claims: Mapped[str | None] = mapped_column(String, nullable=True)
+    manufacturing_info: Mapped[str | None] = mapped_column(String, nullable=True)
+    target_market: Mapped[str | None] = mapped_column(String, nullable=True)
+    development_stage: Mapped[str | None] = mapped_column(String, nullable=True)
+    # list[{"name": str, "quantity": str | None}]
+    ingredients: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # list[str]
+    biological_resources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    ip_status: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    regulatory_status: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    abs_tk_status: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    owner: Mapped["User"] = relationship(foreign_keys=[owner_user_id])
+    organization: Mapped["Organization | None"] = relationship()
