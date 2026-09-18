@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_db
@@ -183,8 +183,22 @@ async def delete_product(
     product = await db.get(Product, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if not can_access_resource(ctx, product):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your product")
+    # Deletion is owner-only, deliberately stricter than read/update (which
+    # use can_access_resource and so admit any member of the product's
+    # organization). A teammate collaborating on a shared dossier should be
+    # able to edit it; destroying it is the owner's call alone.
+    if product.owner_user_id != ctx.user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the product owner can delete it",
+        )
+
+    # Detach, don't cascade: a Case is the assessment/audit record of a
+    # question that was actually asked and answered, and outlives the
+    # product it was about. cases.product_id is nullable with no ON DELETE,
+    # so without this the delete raises a ForeignKeyViolationError (500)
+    # for any product that has ever been assessed.
+    await db.execute(update(Case).where(Case.product_id == product_id).values(product_id=None))
 
     db.add(
         AuditLogEntry(

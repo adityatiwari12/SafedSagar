@@ -154,3 +154,84 @@ async def test_facilitator_has_no_product_permissions(client, make_user):
 
     resp = await client.get("/products", headers=headers)
     assert resp.status_code == 403
+
+
+async def test_delete_product_with_linked_case_detaches_instead_of_500(client, make_user):
+    """A Case is the assessment record of a question actually asked and
+    answered; it outlives the product it was about. cases.product_id is a
+    plain nullable FK with no ON DELETE, so deleting an assessed product
+    raised a ForeignKeyViolationError (500) until delete_product detached
+    them first."""
+    import uuid as _uuid
+
+    from sqlalchemy import select
+
+    from app.db.base import AsyncSessionLocal
+    from app.db.models import Case, CaseRiskLevel, CaseStatus, User
+
+    email, _password, token = await make_user()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = await client.post("/products", json={"name": "Assessed Product"}, headers=headers)
+    product_id = resp.json()["id"]
+
+    # Seed the Case directly rather than driving /chat: this test is about
+    # the FK, not the graph, and a live LLM turn would make it slow.
+    async with AsyncSessionLocal() as session:
+        user = await session.scalar(select(User).where(User.email == email))
+        case = Case(
+            user_id=user.id,
+            product_id=_uuid.UUID(product_id),
+            question="Can I patent this?",
+            risk_level=CaseRiskLevel.low,
+            status=CaseStatus.resolved,
+        )
+        session.add(case)
+        await session.commit()
+        case_id = case.id
+
+    resp = await client.delete(f"/products/{product_id}", headers=headers)
+    assert resp.status_code == 204, resp.text
+
+    async with AsyncSessionLocal() as session:
+        surviving = await session.get(Case, case_id)
+        assert surviving is not None, "deleting a product must not destroy its assessment history"
+        assert surviving.product_id is None
+
+
+async def test_org_member_can_read_and_edit_but_not_delete(client, make_user):
+    """Deletion is owner-only, deliberately stricter than read/update: a
+    teammate collaborating on a shared dossier can edit it, but destroying
+    it is the owner's call alone."""
+    import uuid as _uuid
+
+    ministry_headers = await _auth_headers(make_user, role="ministry_admin")
+    resp = await client.post(
+        "/admin/organizations",
+        json={"name": f"Org-{_uuid.uuid4().hex[:8]}", "org_type": "startup"},
+        headers=ministry_headers,
+    )
+    org_id = resp.json()["id"]
+
+    owner_headers = await _auth_headers(make_user, organization_id=_uuid.UUID(org_id))
+    teammate_headers = await _auth_headers(make_user, organization_id=_uuid.UUID(org_id))
+
+    resp = await client.post(
+        "/products",
+        json={"name": "Shared Org Dossier", "organization_id": org_id},
+        headers=owner_headers,
+    )
+    assert resp.status_code == 201, resp.text
+    product_id = resp.json()["id"]
+
+    assert (await client.get(f"/products/{product_id}", headers=teammate_headers)).status_code == 200
+
+    resp = await client.patch(
+        f"/products/{product_id}", json={"development_stage": "pilot"}, headers=teammate_headers
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = await client.delete(f"/products/{product_id}", headers=teammate_headers)
+    assert resp.status_code == 403
+
+    assert (await client.delete(f"/products/{product_id}", headers=owner_headers)).status_code == 204
