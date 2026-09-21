@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AppShell } from '../layout/AppShell'
+import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import {
   Basis,
   ClassificationResult,
@@ -109,7 +109,7 @@ export default function ClassificationWizard() {
   }
 
   return (
-    <AppShell>
+    <AppWorkspaceShell>
       <div className="mx-auto max-w-2xl space-y-5">
         <header>
           <h1 className="text-2xl font-bold text-navy">Product classification</h1>
@@ -300,6 +300,6 @@ export default function ClassificationWizard() {
           )}
         </div>
       </div>
-    </AppShell>
+    </AppWorkspaceShell>
   )
 }

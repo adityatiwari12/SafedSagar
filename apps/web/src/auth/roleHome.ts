@@ -5,12 +5,10 @@ import { UserRole } from '../api/authApi'
 export function roleHomePath(role: UserRole): string {
   switch (role) {
     case 'user':
-      return '/ask'
     case 'facilitator':
     case 'regulatory_expert':
-      return '/cases'
     case 'admin':
-      return '/admin'
+      return '/dashboard'
     default:
       return '/placeholder'
   }

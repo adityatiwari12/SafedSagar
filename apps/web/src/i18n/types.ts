@@ -367,6 +367,40 @@ export type MessageTree = {
     corpusBody: string
     checkingSession: string
     sampleScenario: string
+    queryLabel: string
+    assessmentLabel: string
+    assessmentTitle: string
+    assessmentEmpty: string
+    statusStrip: string
+    sourcesShort: string
+    sectionAnswer: string
+    sectionWhy: string
+    sectionClassification: string
+    sectionJurisdiction: string
+    sectionEvidence: string
+    sectionConfidence: string
+    sectionAbs: string
+    sectionLimitations: string
+    sectionNextSteps: string
+    sectionEscalation: string
+    jurisdictionNote: string
+    noEvidence: string
+    moreEvidence: string
+    whyClassification: string
+    whyEvidence: string
+    whyNoEvidence: string
+    whyAbs: string
+    viewEnglish: string
+    viewTranslated: string
+    absBio: string
+    absTk: string
+    limitLowConfidence: string
+    limitOutOfScope: string
+    limitNoCitations: string
+    limitTranslation: string
+    limitEscalate: string
+    limitDisclaimer: string
+    escalationHint: string
   }
   auth: {
     loginTitle: string

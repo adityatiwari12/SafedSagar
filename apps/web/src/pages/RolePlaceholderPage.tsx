@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { AppShell } from '../layout/AppShell'
+import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { useAuth } from '../auth/AuthContext'
 
 export default function RolePlaceholderPage() {
@@ -7,7 +7,7 @@ export default function RolePlaceholderPage() {
   const isPending = user?.verification_status === 'pending'
 
   return (
-    <AppShell>
+    <AppWorkspaceShell>
       <div className="gov-panel max-w-2xl p-6">
         <h1 className="text-2xl font-bold text-navy">
           {isPending ? 'Verification pending' : 'Facilitator / Admin workspace'}
@@ -35,6 +35,6 @@ export default function RolePlaceholderPage() {
           Back to login
         </Link>
       </div>
-    </AppShell>
+    </AppWorkspaceShell>
   )
 }

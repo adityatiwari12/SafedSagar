@@ -1,6 +1,7 @@
 import { MouseEvent, useEffect, useState } from 'react'
 import { conversationsApi, ConversationSummary } from '../api/conversationsApi'
 import { ApiError } from '../api/http'
+import { useLanguage } from '../i18n/LanguageContext'
 
 function relativeDate(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
@@ -32,6 +33,7 @@ export function ChatHistorySidebar({
   // retitled one) shows up without a manual refresh.
   refreshKey: number
 }) {
+  const { t } = useLanguage()
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -67,13 +69,13 @@ export function ChatHistorySidebar({
   }
 
   return (
-    <div className="gov-panel flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-surface-border bg-surface-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-        Chat history
+    <div className="flex h-full min-h-0 flex-col border border-surface-border bg-white">
+      <div className="shrink-0 border-b border-surface-border bg-ivory/60 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        {t('chat.history')}
       </div>
       <div className="shrink-0 p-3">
         <button type="button" className="gov-btn-primary w-full !py-1.5 text-sm" onClick={onNewChat}>
-          + New chat
+          {t('chat.newChat')}
         </button>
       </div>
       <div

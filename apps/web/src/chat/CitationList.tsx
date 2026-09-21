@@ -1,34 +1,19 @@
 import { Citation } from '../api/chatApi'
+import { EvidenceList } from '../ui/primitives'
 
 export function CitationList({ citations }: { citations: Citation[] }) {
   if (!citations.length) return null
 
   return (
-    <ol className="mt-2 space-y-3">
-      {citations.map((c, i) => (
-        <li key={`${c.doc_id}-${i}`} className="border-l-4 border-primary pl-3 text-sm">
-          <p className="font-semibold text-ink">
-            [{i + 1}] {c.title}
-          </p>
-          <p className="text-ink-muted">
-            <span className="font-medium">{c.doc_id}</span>
-            {c.section_or_article ? ` · ${c.section_or_article}` : ''}
-          </p>
-          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
-            {c.last_verified_date && <span>Last verified: {c.last_verified_date}</span>}
-            {c.source_url && (
-              <a
-                href={c.source_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline hover:text-primary-dark"
-              >
-                Open source
-              </a>
-            )}
-          </p>
-        </li>
-      ))}
-    </ol>
+    <EvidenceList
+      items={citations.map((c) => ({
+        title: c.title,
+        docId: c.doc_id,
+        provision: c.section_or_article ?? undefined,
+        effectiveDate: c.last_verified_date ?? undefined,
+        sourceUrl: c.source_url ?? undefined,
+        why: 'Retrieved evidence supporting the answer — confirm against the official text.',
+      }))}
+    />
   )
 }

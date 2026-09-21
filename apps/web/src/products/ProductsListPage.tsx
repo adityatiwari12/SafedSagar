@@ -1,7 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AppShell } from '../layout/AppShell'
+import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { ApiError } from '../api/http'
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  StatusBadge,
+} from '../ui/primitives'
 import {
   humanizeClassification,
   PRODUCT_CLASSIFICATIONS,
@@ -46,7 +53,7 @@ function NewProductForm({ onCancel, onCreated }: { onCancel: () => void; onCreat
   }
 
   return (
-    <form className="gov-panel space-y-4 p-4" onSubmit={submit}>
+    <form className="space-y-4 border border-surface-border bg-white p-4" onSubmit={submit}>
       <h2 className="text-lg font-bold text-navy">Add product</h2>
 
       <div>
@@ -94,7 +101,6 @@ function NewProductForm({ onCancel, onCreated }: { onCancel: () => void; onCreat
             ))}
           </select>
         </div>
-
         <div>
           <label className="gov-label" htmlFor="new-product-jurisdiction">
             Jurisdiction
@@ -133,14 +139,11 @@ function NewProductForm({ onCancel, onCreated }: { onCancel: () => void; onCreat
           className="gov-input"
           value={developmentStage}
           onChange={(e) => setDevelopmentStage(e.target.value)}
+          placeholder="e.g. research, prototype, market-ready"
         />
       </div>
 
-      {error && (
-        <p className="rounded-sm bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorState message={error} />}
 
       <div className="flex flex-wrap gap-2">
         <button type="submit" className="gov-btn-primary" disabled={busy}>
@@ -166,31 +169,32 @@ function ProductCard({ product, onOpen }: { product: Product; onOpen: () => void
           onOpen()
         }
       }}
-      className="gov-panel cursor-pointer space-y-2 p-4 transition-colors hover:border-saffron"
+      className="cursor-pointer space-y-3 border border-surface-border bg-white p-4 transition-colors hover:border-forest"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <h2 className="text-lg font-bold text-navy">{product.name}</h2>
         <span className="text-xs text-ink-faint">
           Updated {new Date(product.updated_at).toLocaleDateString()}
         </span>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-muted">
-        <span>
-          <span className="font-semibold text-ink">Classification:</span>{' '}
-          {humanizeClassification(product.product_classification)}
-        </span>
-        <span>
-          <span className="font-semibold text-ink">Jurisdiction:</span>{' '}
-          {product.jurisdiction === 'india'
-            ? 'India'
-            : product.jurisdiction === 'international'
-              ? 'International'
-              : 'Not set'}
-        </span>
-        <span>
-          <span className="font-semibold text-ink">Stage:</span>{' '}
-          {product.development_stage || 'Not set'}
-        </span>
+      <div className="flex flex-wrap gap-2">
+        <StatusBadge
+          status={product.product_classification ? 'medium' : 'draft'}
+          label={humanizeClassification(product.product_classification)}
+        />
+        <StatusBadge
+          status={product.jurisdiction ? 'open' : 'draft'}
+          label={
+            product.jurisdiction === 'india'
+              ? 'India'
+              : product.jurisdiction === 'international'
+                ? 'International'
+                : 'Jurisdiction not set'
+          }
+        />
+        {product.development_stage && (
+          <StatusBadge status="in_progress" label={product.development_stage} />
+        )}
       </div>
     </div>
   )
@@ -221,22 +225,19 @@ export default function ProductsListPage() {
   }, [])
 
   return (
-    <AppShell>
+    <AppWorkspaceShell>
       <div className="space-y-5">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-navy">My products</h1>
-            <p className="mt-1 text-sm text-ink-muted">
-              Each product dossier tracks formulation, classification, and IP/regulatory/ABS status
-              in one place.
-            </p>
-          </div>
-          {!showForm && products.length > 0 && (
-            <button type="button" className="gov-btn-primary" onClick={() => setShowForm(true)}>
-              Add product
-            </button>
-          )}
-        </header>
+        <PageHeader
+          title="My products"
+          description="Each dossier tracks formulation, classification, pathways and Sahayak assessments in one place."
+          actions={
+            !showForm && products.length > 0 ? (
+              <button type="button" className="gov-btn-primary" onClick={() => setShowForm(true)}>
+                Add product
+              </button>
+            ) : undefined
+          }
+        />
 
         {showForm && (
           <NewProductForm
@@ -246,23 +247,30 @@ export default function ProductsListPage() {
         )}
 
         {error && (
-          <div className="rounded-sm bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-            <p>{error}</p>
-            <button type="button" className="gov-btn-secondary mt-2 !py-1 text-xs" onClick={() => void load()}>
+          <div>
+            <ErrorState message={error} />
+            <button
+              type="button"
+              className="gov-btn-secondary mt-2 !py-1 text-xs"
+              onClick={() => void load()}
+            >
               Retry
             </button>
           </div>
         )}
 
-        {loading && <p className="text-sm text-ink-muted">Loading products…</p>}
+        {loading && <LoadingState label="Loading products…" />}
 
         {!loading && !error && products.length === 0 && !showForm && (
-          <div className="gov-panel border-dashed p-8 text-center">
-            <p className="text-sm text-ink-muted">No products yet.</p>
-            <button type="button" className="gov-btn-primary mt-4" onClick={() => setShowForm(true)}>
-              Add product
-            </button>
-          </div>
+          <EmptyState
+            title="No products yet"
+            description="Create a dossier to track formulation, classification and IP/regulatory pathways."
+            action={
+              <button type="button" className="gov-btn-primary" onClick={() => setShowForm(true)}>
+                Add product
+              </button>
+            }
+          />
         )}
 
         {!loading && products.length > 0 && (
@@ -273,6 +281,6 @@ export default function ProductsListPage() {
           </div>
         )}
       </div>
-    </AppShell>
+    </AppWorkspaceShell>
   )
 }

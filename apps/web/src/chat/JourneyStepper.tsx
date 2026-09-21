@@ -47,7 +47,7 @@ export function JourneyStepper({ active }: { active: JourneyStepId }) {
   const activeIndex = STEP_KEYS.findIndex((s) => s.id === active)
 
   return (
-    <nav aria-label={t('chat.journeyAria')} className="gov-panel overflow-x-auto p-3">
+    <nav aria-label={t('chat.journeyAria')} className="overflow-x-auto border border-surface-border bg-white p-3">
       <ol className="flex min-w-max gap-1">
         {STEP_KEYS.map((step, i) => {
           const done = i < activeIndex

@@ -13,6 +13,7 @@ function renderAt(path: string) {
           <Route path="/login" element={<div>login page</div>} />
           <Route path="/placeholder" element={<div>placeholder page</div>} />
           <Route path="/cases" element={<div>cases page</div>} />
+          <Route path="/dashboard" element={<div>dashboard page</div>} />
           <Route
             path="/"
             element={
@@ -58,7 +59,7 @@ test('renders children when authenticated and role allowed', () => {
   expect(screen.getByText('protected content')).toBeInTheDocument()
 })
 
-test('redirects to role home (/cases) when role not allowed', () => {
+test('redirects to role home (/dashboard) when role not allowed', () => {
   vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
     user: {
       id: '1',
@@ -74,5 +75,5 @@ test('redirects to role home (/cases) when role not allowed', () => {
     logout: vi.fn(),
   })
   renderAt('/')
-  expect(screen.getByText('cases page')).toBeInTheDocument()
+  expect(screen.getByText('dashboard page')).toBeInTheDocument()
 })

@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { useLanguage } from '../i18n/LanguageContext'
 
 export function MessageBubble({
   role,
@@ -7,30 +8,26 @@ export function MessageBubble({
   role: 'user' | 'assistant'
   children: ReactNode
 }) {
+  const { t } = useLanguage()
   const isUser = role === 'user'
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[min(85%,42rem)] rounded-2xl rounded-br-md bg-saffron px-4 py-2.5 text-sm leading-relaxed text-white shadow-panel">
-          {children}
-        </div>
+      <div className="border-l-2 border-saffron bg-ivory/80 px-4 py-3">
+        <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+          {t('chat.queryLabel')}
+        </p>
+        <div className="text-sm leading-relaxed text-ink">{children}</div>
       </div>
     )
   }
 
   return (
-    <div className="flex justify-start gap-3">
-      <div
-        aria-hidden="true"
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-forest text-[0.7rem] font-bold text-white"
-      >
-        S
-      </div>
-      <div className="min-w-0 max-w-[min(100%,44rem)] flex-1 text-sm leading-relaxed text-ink">
-        <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-faint">Sahayak</p>
-        {children}
-      </div>
+    <div>
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        {t('chat.assessmentLabel')}
+      </p>
+      {children}
     </div>
   )
 }

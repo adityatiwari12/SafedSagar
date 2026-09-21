@@ -1,118 +1,192 @@
-import { useState } from 'react'
+import { ReactNode, useState } from 'react'
 import { ChatTurnResponse } from '../api/chatApi'
+import { useLanguage } from '../i18n/LanguageContext'
 import { CitationList } from './CitationList'
+import { ConfidenceBadge, StatusBadge } from '../ui/primitives'
 
-const BAND_DOT = {
-  high: 'bg-ayush-bright',
-  medium: 'bg-saffron',
-  low: 'bg-red-600',
-} as const
+function Section({
+  title,
+  children,
+  tone = 'default',
+}: {
+  title: string
+  children: ReactNode
+  tone?: 'default' | 'warn' | 'accent'
+}) {
+  const border =
+    tone === 'warn'
+      ? 'border-red-200'
+      : tone === 'accent'
+        ? 'border-saffron/50'
+        : 'border-surface-border'
+  return (
+    <section className={`border-t ${border} pt-3 first:border-t-0 first:pt-0`}>
+      <h3 className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        {title}
+      </h3>
+      {children}
+    </section>
+  )
+}
 
 export function AnswerPanel({ response }: { response: ChatTurnResponse }) {
+  const { t } = useLanguage()
   const [showEnglish, setShowEnglish] = useState(false)
 
   if (!response.answer && response.clarifying_questions?.length) return null
 
+  const product = response.classification.product_type.replace(/_/g, ' ')
+  const ip = response.classification.ip_type.replace(/_/g, ' ')
+  const jurisdictionLabel =
+    response.jurisdiction === 'india' ? t('jurisdiction.india') : t('jurisdiction.international')
   const hasClassification =
     response.classification.product_type !== 'unknown' || response.classification.ip_type !== 'unknown'
-  const pct = Math.round(response.confidence * 100)
-
   const isTranslated = Boolean(
     response.detected_language && response.detected_language !== 'en' && response.canonical_answer,
   )
+  const abs = response.abs_tk_flags
+  const absActive = Boolean(
+    abs && (abs.biological_resource_likely || abs.traditional_knowledge_likely),
+  )
+  const showLimitations =
+    response.confidence_band === 'low' ||
+    response.needs_human_review ||
+    response.escalate_recommended ||
+    response.classification.product_type === 'out_of_scope' ||
+    response.citations.length === 0
+
+  const whyBits: string[] = []
+  if (hasClassification) {
+    whyBits.push(
+      t('chat.whyClassification')
+        .replace('{product}', product)
+        .replace('{ip}', ip)
+        .replace('{jurisdiction}', jurisdictionLabel),
+    )
+  }
+  if (response.citations.length > 0) {
+    whyBits.push(
+      t('chat.whyEvidence').replace('{count}', String(response.citations.length)),
+    )
+  } else {
+    whyBits.push(t('chat.whyNoEvidence'))
+  }
+  if (absActive) whyBits.push(t('chat.whyAbs'))
 
   return (
-    <div className="space-y-3">
-      {/* The answer reads first, as chat text - not buried under badges. */}
-      {response.answer && (
-        <div
-          className="whitespace-pre-wrap text-[0.95rem] leading-relaxed text-ink"
-          lang={showEnglish ? 'en' : response.detected_language || 'en'}
-        >
-          {showEnglish && response.canonical_answer ? response.canonical_answer : response.answer}
-        </div>
-      )}
-
-      {/* One compact meta line instead of stacked badges - classification,
-          confidence, and translation status are useful context, not the
-          headline of every reply. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
-        {hasClassification && (
-          <span className="capitalize">
-            {response.classification.product_type.replace(/_/g, ' ')} ·{' '}
-            {response.jurisdiction === 'india' ? 'India' : 'International'}
-          </span>
+    <div className="space-y-3 rounded-sm border border-surface-border bg-white p-4 sm:p-5">
+      <Section title={t('chat.sectionAnswer')}>
+        {response.answer && (
+          <div
+            className="whitespace-pre-wrap text-[0.95rem] leading-relaxed text-ink"
+            lang={showEnglish ? 'en' : response.detected_language || 'en'}
+          >
+            {showEnglish && response.canonical_answer ? response.canonical_answer : response.answer}
+          </div>
         )}
-        <span className="inline-flex items-center gap-1">
-          <span className={`h-1.5 w-1.5 rounded-full ${BAND_DOT[response.confidence_band]}`} aria-hidden="true" />
-          Confidence: {response.confidence_band} ({pct}%)
-        </span>
         {isTranslated && (
           <button
             type="button"
-            className="underline decoration-dotted hover:text-ink-muted"
+            className="mt-2 text-xs font-semibold text-forest underline decoration-dotted underline-offset-2"
             onClick={() => setShowEnglish((v) => !v)}
           >
-            {showEnglish ? 'View translated' : 'View in English'}
+            {showEnglish ? t('chat.viewTranslated') : t('chat.viewEnglish')}
           </button>
         )}
-        {response.needs_human_review && (
-          <span className="text-amber-800">Translation unverified - showing safest available text</span>
-        )}
-      </div>
+      </Section>
 
-      {response.confidence_band === 'low' && response.classification.product_type !== 'out_of_scope' && (
-        <p className="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900" role="status">
-          Low confidence — this answer may be incomplete. Prefer rephrasing your question or
-          escalating to a human IP facilitator rather than relying on this alone.
-        </p>
+      {whyBits.length > 0 && (
+        <Section title={t('chat.sectionWhy')}>
+          <ul className="list-disc space-y-1 pl-4 text-sm text-ink-muted">
+            {whyBits.map((bit) => (
+              <li key={bit}>{bit}</li>
+            ))}
+          </ul>
+        </Section>
       )}
 
-      {response.abs_tk_flags &&
-        (response.abs_tk_flags.biological_resource_likely ||
-          response.abs_tk_flags.traditional_knowledge_likely) && (
-          <aside
-            className="rounded-sm border border-saffron/60 bg-orange-50 p-3 text-sm text-ink"
-            aria-label="ABS and traditional knowledge check"
-          >
-            <p className="font-bold text-navy">ABS / TK check</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {response.abs_tk_flags.biological_resource_likely && (
-                <li>Biological resource indicators present — ABS approval may be required.</li>
-              )}
-              {response.abs_tk_flags.traditional_knowledge_likely && (
-                <li>
-                  Traditional knowledge indicators present — TKDL prior art may exist (contact
-                  CSIR-TKDL; contents are not retrieved here).
-                </li>
-              )}
-            </ul>
-            {response.abs_tk_flags.note && (
-              <p className="mt-2 text-ink-muted">{response.abs_tk_flags.note}</p>
-            )}
-          </aside>
-        )}
+      <Section title={t('chat.sectionClassification')}>
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge
+            status={
+              response.classification.product_type === 'out_of_scope'
+                ? 'low'
+                : response.classification.product_type === 'unknown'
+                  ? 'draft'
+                  : 'medium'
+            }
+            label={product}
+          />
+          <StatusBadge
+            status={response.classification.ip_type === 'unknown' ? 'draft' : 'open'}
+            label={`IP: ${ip}`}
+          />
+        </div>
+      </Section>
 
-      {response.citations.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer font-semibold text-primary hover:text-primary-dark">
-            Sources ({response.citations.length})
-          </summary>
+      <Section title={t('chat.sectionJurisdiction')}>
+        <p className="text-sm text-ink">
+          <span className="font-semibold text-navy">{jurisdictionLabel}</span>
+          <span className="text-ink-muted"> — {t('chat.jurisdictionNote')}</span>
+        </p>
+      </Section>
+
+      <Section title={t('chat.sectionEvidence')}>
+        {response.citations.length > 0 ? (
           <CitationList citations={response.citations} />
-        </details>
+        ) : (
+          <p className="text-sm text-ink-muted">{t('chat.noEvidence')}</p>
+        )}
+      </Section>
+
+      <Section title={t('chat.sectionConfidence')}>
+        <ConfidenceBadge band={response.confidence_band} confidence={response.confidence} />
+      </Section>
+
+      {absActive && abs && (
+        <Section title={t('chat.sectionAbs')} tone="accent">
+          <aside className="border border-saffron/50 bg-orange-50 px-3 py-2.5 text-sm text-ink" aria-label="ABS and traditional knowledge check">
+            <ul className="list-disc space-y-1 pl-4">
+              {abs.biological_resource_likely && <li>{t('chat.absBio')}</li>}
+              {abs.traditional_knowledge_likely && <li>{t('chat.absTk')}</li>}
+            </ul>
+            {abs.note && <p className="mt-2 text-ink-muted">{abs.note}</p>}
+          </aside>
+        </Section>
+      )}
+
+      {showLimitations && (
+        <Section title={t('chat.sectionLimitations')} tone="warn">
+          <ul className="list-disc space-y-1 pl-4 text-sm text-ink-muted">
+            {response.confidence_band === 'low' &&
+              response.classification.product_type !== 'out_of_scope' && (
+                <li>{t('chat.limitLowConfidence')}</li>
+              )}
+            {response.classification.product_type === 'out_of_scope' && (
+              <li>{t('chat.limitOutOfScope')}</li>
+            )}
+            {response.citations.length === 0 && <li>{t('chat.limitNoCitations')}</li>}
+            {response.needs_human_review && <li>{t('chat.limitTranslation')}</li>}
+            {response.escalate_recommended && <li>{t('chat.limitEscalate')}</li>}
+            <li>{t('chat.limitDisclaimer')}</li>
+          </ul>
+        </Section>
       )}
 
       {response.next_steps && response.next_steps.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer font-semibold text-primary hover:text-primary-dark">
-            Suggested next steps
-          </summary>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink">
+        <Section title={t('chat.sectionNextSteps')}>
+          <ol className="list-decimal space-y-1.5 pl-4 text-sm text-ink">
             {response.next_steps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
-        </details>
+        </Section>
+      )}
+
+      {response.escalate_recommended && (
+        <Section title={t('chat.sectionEscalation')} tone="warn">
+          <p className="text-sm text-red-900">{t('chat.escalationHint')}</p>
+        </Section>
       )}
     </div>
   )
