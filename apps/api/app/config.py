@@ -1,9 +1,12 @@
 """Application settings and configuration."""
 
+import logging
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 _MIN_JWT_SECRET_LENGTH = 32
 _PLACEHOLDER_MARKER = "change-in-production"
@@ -34,6 +37,19 @@ class Settings(BaseSettings):
     cloud_llm_base_url: str | None = None
     cloud_llm_api_key: str | None = None
     cloud_llm_model: str | None = None
+    # Some OpenAI-compatible providers reject `response_format:
+    # {"type":"json_object"}` outright (400/422 mentioning response_format).
+    # When true (default), cloud_client sends it and, if a provider rejects
+    # it, retries once without it and extracts JSON from the (possibly
+    # ```json-fenced) text instead. Set false to skip straight to that mode
+    # for a provider already known not to support it.
+    cloud_llm_json_mode: bool = True
+    # If the cloud provider fails after its retry budget (network error,
+    # expired/invalid key past the fail-fast check, persistent 5xx, etc.),
+    # fall back to local Ollama for that call rather than raising - a demo
+    # must not die because a cloud API key expired or the network dropped.
+    # generate.get_last_call_metadata().fallback_used reports when this fired.
+    llm_fallback_to_local: bool = True
 
     chroma_base_url: str = "http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database"
     chroma_collection: str = "source_chunks"
@@ -59,6 +75,45 @@ class Settings(BaseSettings):
                 f"{_MIN_JWT_SECRET_LENGTH} characters, not the placeholder"
             )
         return v
+
+    @model_validator(mode="after")
+    def _check_cloud_llm_configured(self) -> "Settings":
+        # Fail fast if a cloud provider is selected (either as the default
+        # generation provider or just for reason_and_cite) but isn't actually
+        # configured - a misconfigured provider should be caught at boot, not
+        # on the first request. If llm_fallback_to_local is on, every cloud
+        # call would just fail-and-fall-back-to-Ollama anyway (see
+        # app/llm/generate.py), so don't crash the whole API over an optional
+        # provider - warn loudly instead and let it run local.
+        uses_cloud = self.llm_provider == "cloud" or self.llm_reasoning_provider == "cloud"
+        if not uses_cloud:
+            return self
+        missing = [
+            name
+            for name, value in (
+                ("CLOUD_LLM_BASE_URL", self.cloud_llm_base_url),
+                ("CLOUD_LLM_MODEL", self.cloud_llm_model),
+            )
+            if not value
+        ]
+        if not missing:
+            return self
+        message = (
+            f"Cloud LLM provider selected (LLM_PROVIDER/LLM_REASONING_PROVIDER=cloud) "
+            f"but missing: {', '.join(missing)}."
+        )
+        if self.llm_fallback_to_local:
+            logger.warning(
+                "%s LLM_FALLBACK_TO_LOCAL is on, so cloud calls will fail over to "
+                "Ollama at request time - fix this before a real demo.",
+                message,
+            )
+        else:
+            raise ValueError(
+                f"{message} Set them, or set LLM_FALLBACK_TO_LOCAL=true to run on "
+                f"Ollama instead."
+            )
+        return self
 
 
 settings = Settings()

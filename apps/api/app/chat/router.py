@@ -16,6 +16,7 @@ from app.auth.dependencies import get_current_user, get_db, resolve_user_from_to
 from app.cases.service import derive_case_outcome
 from app.chat.schemas import (
     AbsTkFlagsOut,
+    AnsweredByOut,
     ChatTurnRequest,
     ChatTurnResponse,
     ClassificationOut,
@@ -42,6 +43,7 @@ from app.db.models import (
 )
 from app.graph.graph import NodeDoneCallback, run_classification, run_graph, run_remaining
 from app.graph.state import GraphState
+from app.llm.generate import get_last_call_metadata
 from app.translation.languages import DEFAULT_LANGUAGE, is_supported
 from app.translation.translation_service import get_translation_service
 
@@ -519,6 +521,16 @@ async def _process_chat_turn(
     outgoing = translation_service.resolve_outgoing(canonical_answer, target_language)
 
     ip_types = state.get("ip_types", [])
+    call_metadata = get_last_call_metadata()
+    answered_by = (
+        AnsweredByOut(
+            provider=call_metadata.provider,
+            model=call_metadata.model,
+            fallback_used=call_metadata.fallback_used,
+        )
+        if call_metadata
+        else None
+    )
     response = ChatTurnResponse(
         conversationId=str(conversation.id),
         classification=ClassificationOut(
@@ -539,6 +551,7 @@ async def _process_chat_turn(
         translation_status=outgoing.translation_status,
         needs_human_review=outgoing.needs_human_review,
         timing_ms=state.get("node_timings"),
+        answered_by=answered_by,
     )
 
     db.add(

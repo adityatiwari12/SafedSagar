@@ -37,6 +37,12 @@ class AbsTkFlagsOut(BaseModel):
     note: str | None = None
 
 
+class AnsweredByOut(BaseModel):
+    provider: str  # "ollama" | "cloud"
+    model: str
+    fallback_used: bool = False
+
+
 class ChatTurnResponse(BaseModel):
     conversationId: str
     clarifying_questions: list[str] | None = None
@@ -61,6 +67,11 @@ class ChatTurnResponse(BaseModel):
     # {"retrieve": 210.4, "reason_and_cite": 25890.2} - debugging/tuning
     # aid for RAG latency, not shown by default in the UI.
     timing_ms: dict[str, float] | None = None
+    # Which provider/model actually produced this answer (see
+    # app/llm/generate.py's get_last_call_metadata) - None on turns that
+    # short-circuit before reason_and_cite runs (out-of-scope refusal,
+    # clarifying-question turns).
+    answered_by: AnsweredByOut | None = None
 
 
 class EscalateRequest(BaseModel):

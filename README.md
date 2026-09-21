@@ -17,6 +17,7 @@ that query — see [How answers are grounded](#how-answers-are-grounded).
 - [Stack](#stack)
 - [Repo layout](#repo-layout)
 - [Quick start](#quick-start) — full stack: Docker, Ollama, API, Web, translation sidecar
+- [LLM provider (local/cloud)](#llm-provider-localcloud)
 - [API reference](#api-reference)
 - [RBAC](#rbac)
 - [Multilingual support](#multilingual-support)
@@ -150,6 +151,48 @@ ceiling for reasoning (a 20B "thinking" model was tried and reverted — see
 hardware). If RAM is tight, don't run the translation sidecar as an always-on background
 service — start it only when testing non-English chat.
 
+## LLM provider (local/cloud)
+
+Every LLM call in the graph (`classify_product`, `condense_query`, `route_jurisdiction`,
+`route_ip_type`, `reason_and_cite`) goes through one facade, `app/llm/generate.py`, which
+picks between two backends:
+
+| Provider | Setting | What it is |
+| --- | --- | --- |
+| `ollama` (default) | `LLM_PROVIDER=ollama` | Local `llama3.2` via Ollama — everything stays on this machine |
+| `cloud` | `LLM_PROVIDER=cloud` | Any OpenAI-compatible `/chat/completions` endpoint (Groq, OpenRouter, a hosted vLLM/TGI instance, ...) |
+
+**Switching:** set `LLM_PROVIDER=cloud` plus `CLOUD_LLM_BASE_URL`, `CLOUD_LLM_MODEL`, and
+`CLOUD_LLM_API_KEY` in `apps/api/.env` (see `.env.example` for the full list, including
+`CLOUD_LLM_JSON_MODE` and `LLM_FALLBACK_TO_LOCAL`). A cloud provider selected without
+`CLOUD_LLM_BASE_URL`/`CLOUD_LLM_MODEL` set fails fast at API startup with a clear error —
+unless `LLM_FALLBACK_TO_LOCAL` is on, in which case it logs a loud warning instead and runs
+on Ollama, so a misconfigured optional provider never takes the whole API down.
+
+**Recommended setup — cloud for reasoning only:** rather than flipping every call to cloud,
+set just `LLM_REASONING_PROVIDER=cloud` and leave `LLM_PROVIDER=ollama`. This spends cloud
+calls only on `reason_and_cite` (the final-answer call, where quality matters most) while
+`classify_product`/`condense_query`/`route_*` — frequent, latency-sensitive, categorical
+calls — stay local and free.
+
+**Reliability:** cloud calls get a bounded retry with backoff on transient failures (429,
+5xx, timeouts); a 4xx auth/validation error is never retried. Some OpenAI-compatible
+providers reject `response_format: {"type": "json_object"}` outright — that's detected and
+retried once without it, parsing JSON out of the (possibly ```json-fenced) response text.
+The API key is never written to a log line or exception message.
+
+**Fallback:** if the cloud provider still fails after its retry budget (`LLM_FALLBACK_TO_LOCAL=true`,
+the default), that call falls back to local Ollama rather than failing the request — an
+expired key or a network drop shouldn't kill a demo. Every `/chat` response reports which
+model actually answered via `answered_by: {provider, model, fallback_used}`, so a fallback is
+always visible, never silent.
+
+**DPDP / privacy note:** with `LLM_PROVIDER=cloud` (or `LLM_REASONING_PROVIDER=cloud`), the
+user's question text and the retrieved legal/regulatory chunks are sent to the configured
+third-party endpoint to generate that answer. With the local Ollama default, none of that
+data leaves this machine. Don't point a real user's traffic at a cloud provider without
+knowing who that provider is and what their data-handling terms are.
+
 ## API reference
 
 All endpoints except `/health`, `/auth/register`, and `/auth/login` require a bearer token
@@ -205,7 +248,10 @@ All endpoints except `/health`, `/auth/register`, and `/auth/login` require a be
   "canonical_query": "...",         // English-translated query
   "canonical_answer": "...",        // English answer before translation
   "translation_status": "verified", // verified | not_needed | failed | unavailable
-  "needs_human_review": false       // translation-quality flag, distinct from escalate_recommended
+  "needs_human_review": false,      // translation-quality flag, distinct from escalate_recommended
+  "answered_by": { "provider": "ollama", "model": "llama3.2", "fallback_used": false } // null on turns
+                                     // that short-circuit before reason_and_cite runs - see
+                                     // "LLM provider (local/cloud)" above
 }
 ```
 
