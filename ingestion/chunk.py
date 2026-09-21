@@ -29,6 +29,26 @@ _FOOTNOTE_MARKER_RE = re.compile(
 )
 _FOOTNOTE_LOOKAHEAD_CHARS = 20
 
+# A line starting with a bare four-digit number at the start of a line
+# ("2005. The rules were amended...", a mis-wrapped "Act, 1940" cross-
+# reference or amendment date) matches _SECTION_MARKER_RE just as well as
+# a real section number does. No Indian statute in this corpus runs
+# anywhere near section 1800 - the largest Acts here run to a few hundred
+# sections - so a candidate label that is purely digits and falls in
+# 1800-2099 is a year, not a section, and gets rejected as a boundary.
+# Applied to all three alternatives (bare-number and the explicit
+# "Section"/"Article" keyword forms), not just the bare-number one: a
+# stray line beginning "Section 1940." or "Article 2005" is exactly as
+# implausible as a real section/article reference in this corpus and just
+# as likely to be a mis-wrapped year, so there's no reason to special-case
+# the keyword forms as exempt.
+_YEAR_LABEL_RANGE = range(1800, 2100)
+
+
+def _is_year_label(label: str) -> bool:
+    return label.isdigit() and int(label) in _YEAR_LABEL_RANGE
+
+
 _MIN_SECTION_MATCHES = 5
 _MAX_SECTION_MULTIPLE = 3  # split a section further only past this x target_chars
 
@@ -84,6 +104,7 @@ def chunk_text(
     matches = [
         m for m in all_matches
         if not _FOOTNOTE_MARKER_RE.match(full_text[m.end() : m.end() + _FOOTNOTE_LOOKAHEAD_CHARS])
+        and not _is_year_label(next(g for g in m.groups() if g is not None))
     ]
 
     if len(matches) < _MIN_SECTION_MATCHES:

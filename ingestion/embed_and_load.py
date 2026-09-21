@@ -83,6 +83,28 @@ def get_or_create_collection(client: httpx.Client, name: str) -> str:
     return resp.json()["id"]
 
 
+def chroma_delete_by_doc_id(client: httpx.Client, collection_id: str, doc_id: str) -> None:
+    """Delete every existing chunk for doc_id from Chroma before re-upserting.
+
+    chunk_id embeds the section label (see _chunk_id), so re-chunking a doc
+    with different section boundaries produces a different set of ids than
+    it had before. Without this, the old ids for removed/renamed sections
+    would stay behind as orphaned vectors: Postgres (whose rows are
+    replaced wholesale by doc_id, see load_document) and Chroma would
+    disagree about which chunks exist for this doc_id, and a vector-search
+    hit on a stale id would find nothing when hydrated back against
+    Postgres (retrieve.py's _vector_search silently drops those hits) -
+    fine for correctness, but the doc's vector index silently degrades in
+    all the padding it wastes on dead rows.
+    """
+    resp = client.post(
+        f"{CHROMA_BASE_URL}/collections/{collection_id}/delete",
+        json={"where": {"doc_id": doc_id}},
+        timeout=60.0,
+    )
+    resp.raise_for_status()
+
+
 def chroma_upsert(
     client: httpx.Client,
     collection_id: str,
@@ -119,6 +141,12 @@ async def load_document(
     chroma_embeddings: list[list[float]] = []
     chroma_documents: list[str] = []
     chroma_metadatas: list[dict] = []
+
+    # Drop prior Chroma vectors for this doc first (see chroma_delete_by_doc_id) -
+    # done ahead of the Postgres delete+insert below so both stores end up
+    # holding exactly this run's chunk ids for doc_id, never a mix of old
+    # and new.
+    chroma_delete_by_doc_id(http_client, collection_id, doc_id)
 
     async with AsyncSessionLocal() as session:
         # Drop prior rows for this doc so a failed mid-doc load cannot leave
