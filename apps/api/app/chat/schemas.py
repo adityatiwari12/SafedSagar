@@ -43,6 +43,22 @@ class AnsweredByOut(BaseModel):
     fallback_used: bool = False
 
 
+class RelatedProvisionOut(BaseModel):
+    """A provision the legal knowledge graph connects to this answer
+    (app/kg/expand.py) - shown in a "Related provisions" panel, whether or
+    not the answer cited it. `via` explains the graph path and its
+    provenance, e.g. "Traditional knowledge --RELATES_TO--> The Patents
+    Act, 1970 - Section 3 [curated; source: ipindia-patents-act-1970 3]"."""
+
+    doc_id: str
+    title: str
+    section_or_article: str | None = None
+    jurisdiction: str | None = None
+    relation: str
+    via: str
+    source_url: str | None = None
+
+
 class ChatTurnResponse(BaseModel):
     conversationId: str
     clarifying_questions: list[str] | None = None
@@ -72,6 +88,9 @@ class ChatTurnResponse(BaseModel):
     # short-circuit before reason_and_cite runs (out-of-scope refusal,
     # clarifying-question turns).
     answered_by: AnsweredByOut | None = None
+    # Knowledge-graph neighbours of this answer (app/kg/expand.py) -
+    # additive; empty on turns that don't reach expand_with_graph.
+    related_provisions: list[RelatedProvisionOut] = []
 
 
 class EscalateRequest(BaseModel):

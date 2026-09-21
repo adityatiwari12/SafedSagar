@@ -1,0 +1,240 @@
+# Curated (interpretive) layer of the IP-SAKTI legal knowledge graph.
+#
+# Every entry is a legal claim, so every entry must be backed by text that
+# actually exists in the ingested corpus:
+#   - `source_doc` / `source_section` name the source_documents chunk(s)
+#     that support the edge (default: the dst doc/section).
+#   - `evidence` is a case-insensitive regex that MUST match the
+#     whitespace-collapsed text of at least one chunk with that exact
+#     (doc_id, section_or_article). The builder rejects (logs + skips) the
+#     edge otherwise, and tests/test_kg.py enforces this in CI.
+#
+# Node refs:
+#   category:<PRODUCT_CATEGORIES value>   ip_type:<IP_TYPES value>
+#   concept:<name>                        doc:<doc_id>[#<section_or_article>]
+# A doc ref without #section points at the document node; with it, at the
+# provision node (which must exist in the corpus).
+#
+# Keep this small and defensible - quality over coverage. Rejected
+# candidates (no supporting / correctly-labelled text) are listed at the
+# bottom so nobody re-adds them without evidence.
+
+concepts:
+  traditional_knowledge: Traditional knowledge
+  access_and_benefit_sharing: Access and benefit-sharing (ABS)
+  genetic_resources: Genetic / biological resources
+
+edges:
+  # --- Product category -> regime (India) --------------------------------
+  - src: category:classical_or_generic_medicine
+    relation: GOVERNED_BY
+    dst: doc:india-drugs-and-cosmetics-act-1940#158
+    evidence: 'Ayurveda, Siddha or Unani drugs includes all medicines .{0,200}manufactured exclusively in accordance with the formulae described in the authoritative books'
+    note: Rule 158-B (CDSCO compilation) - ASU drugs under s.3(a) are those made per the authoritative books.
+
+  - src: category:patent_or_proprietary_medicine
+    relation: GOVERNED_BY
+    dst: doc:india-drugs-and-cosmetics-act-1940#158
+    evidence: 'Patent or Proprietary medicine under section 3\s?\(h\)'
+    note: Rule 158-B (CDSCO compilation) - licensing conditions for patent or proprietary ASU medicine under s.3(h).
+
+  - src: category:phytopharmaceutical
+    relation: GOVERNED_BY
+    dst: doc:india-drugs-and-cosmetics-act-1940#2
+    evidence: 'Phytopharmaceutical drug.{0,3} includes purified and standardised fraction'
+    note: Drugs and Cosmetics Rules r.2(eb) definition of phytopharmaceutical drug (CDSCO compilation).
+
+  - src: category:ayurveda_aahara_or_nutraceutical
+    relation: GOVERNED_BY
+    dst: doc:fssai-ayurveda-aahara-regulations-2022#2
+    evidence: 'Ayurveda Aahara.{0,3} means a food prepared in accordance with the recipes'
+    note: FSSAI Ayurveda Aahara Regulations 2022, reg. 2(b) definition.
+
+  # --- IP type -> governing statute (India) ------------------------------
+  # Statute-level (dst without #section, evidence = the short-title
+  # section) where no single substantive provision is the obvious anchor:
+  # these show in the related panel without spending a context slot on a
+  # short-title chunk.
+  - src: ip_type:patent
+    relation: GOVERNED_BY
+    dst: doc:ipindia-patents-act-1970#3
+    evidence: '3\. What are not inventions\. ?.{0,3}The following are not inventions'
+    note: Patents Act s.3 - what are not inventions (patentability exclusions).
+
+  - src: ip_type:trademark
+    relation: GOVERNED_BY
+    dst: doc:india-trade-marks-act-1999#9
+    evidence: 'which are devoid of any distinctive character'
+    note: Trade Marks Act s.9 - absolute grounds for refusal of registration.
+
+  - src: ip_type:copyright
+    relation: GOVERNED_BY
+    dst: doc:india-copyright-act-1957
+    source_section: '1'
+    evidence: 'This Act may be called the Copyright Act, 1957'
+
+  - src: ip_type:design
+    relation: GOVERNED_BY
+    dst: doc:india-designs-act-2000
+    source_section: '1'
+    evidence: 'This Act may be called the Design Act, 2000'
+
+  - src: ip_type:geographical_indication
+    relation: GOVERNED_BY
+    dst: doc:india-gi-act-1999
+    source_section: '1'
+    evidence: 'This Act may be called the Geographical Indications of Goods \(Registration and Protection\) Act, 1999'
+
+  - src: ip_type:drug_regulatory
+    relation: GOVERNED_BY
+    dst: doc:india-drugs-and-cosmetics-act-1940
+    source_section: '1'
+    evidence: 'This Act may be called the Drugs .{0,20}Act, 1940'
+
+  - src: ip_type:access_and_benefit_sharing
+    relation: GOVERNED_BY
+    dst: doc:india-biological-diversity-act-2002#6
+    evidence: 'No person shall apply for any intellectual property right.{0,300}without obtaining the previous approval of the National Biodiversity Authority'
+    note: BD Act s.6 - prior NBA approval before applying for an IPR on Indian biological resources.
+
+  # --- IP type -> international --------------------------------------------
+  - src: ip_type:patent
+    relation: GOVERNED_BY
+    dst: doc:wto-trips-1994#27
+    evidence: 'Article 27 Patentable Subject Matter'
+    note: TRIPS Art. 27 - patentable subject matter.
+
+  - src: ip_type:access_and_benefit_sharing
+    relation: GOVERNED_BY
+    dst: doc:wipo-nagoya-protocol-2010#3
+    evidence: 'Article 3 SCOPE This Protocol shall apply to genetic resources'
+    note: Nagoya Protocol Art. 3 - scope.
+
+  # --- Concept: traditional knowledge --------------------------------------
+  - src: concept:traditional_knowledge
+    relation: RELATES_TO
+    dst: doc:ipindia-patents-act-1970#3
+    evidence: '\(p\) an invention which, in effect, is traditional knowledge or which is an aggregation or duplication of known properties of traditionally known component'
+    note: Patents Act s.3(p) - traditional knowledge is not an invention.
+
+  - src: concept:traditional_knowledge
+    relation: RELATES_TO
+    dst: doc:india-biological-diversity-act-2002#3
+    evidence: 'obtain any biological resource occurring in India or knowledge associated thereto'
+    note: BD Act s.3 - prior NBA approval covers associated knowledge too.
+
+  - src: concept:traditional_knowledge
+    relation: RELATES_TO
+    dst: doc:tkdl-about
+    evidence: 'protect Indian traditional medicinal knowledge and prevent its misappropriation at International Patent Offices'
+    note: TKDL (pointer only - TKDL contents are not retrievable, see CLAUDE.md caveat 1).
+
+  - src: concept:traditional_knowledge
+    relation: RELATES_TO
+    dst: doc:cbd-1992#8
+    evidence: 'indigenous and local communities embodying traditional lifestyles'
+    note: CBD Art. 8(j).
+
+  - src: concept:traditional_knowledge
+    relation: RELATES_TO
+    dst: doc:wipo-nagoya-protocol-2010#7
+    evidence: 'Article 7 ACCESS TO TRADITIONAL KNOWLEDGE ASSOCIATED WITH GENETIC RESOURCES'
+    note: Nagoya Protocol Art. 7.
+
+  - src: concept:traditional_knowledge
+    relation: RELATES_TO
+    dst: doc:wipo-gratk-2024
+    evidence: 'WIPO TREATY ON INTELLECTUAL PROPERTY, GENETIC RESOURCES AND ASSOCIATED TRADITIONAL KNOWLEDGE'
+    note: GRATK - signed 24 May 2024, NOT yet in force.
+
+  # --- Concept: access and benefit-sharing ---------------------------------
+  - src: concept:access_and_benefit_sharing
+    relation: RELATES_TO
+    dst: doc:india-biological-diversity-act-2002#3
+    evidence: 'without previous approval of the National Biodiversity Authority, obtain any biological resource occurring in India'
+    note: BD Act s.3 - prior NBA approval for specified persons.
+
+  - src: concept:access_and_benefit_sharing
+    relation: RELATES_TO
+    dst: doc:india-biological-diversity-act-2002#6
+    evidence: 'No person shall apply for any intellectual property right'
+    note: BD Act s.6 - NBA approval before an IPR application.
+
+  - src: concept:access_and_benefit_sharing
+    relation: RELATES_TO
+    dst: doc:india-biological-diversity-act-2002#7
+    evidence: 'shall obtain any biological resource for commercial utilization.{0,120}except after giving prior intimation to the State Biodiversity Board'
+    note: BD Act s.7 - prior intimation to the SBB (Indian entities).
+
+  - src: concept:access_and_benefit_sharing
+    relation: RELATES_TO
+    dst: doc:india-biological-diversity-act-2002#21
+    evidence: 'ensure that the terms and conditions subject to which approval is granted secures equitable sharing of benefits'
+    note: BD Act s.21 - determination of equitable benefit sharing.
+
+  - src: concept:access_and_benefit_sharing
+    relation: RELATES_TO
+    dst: doc:wipo-nagoya-protocol-2010#3
+    evidence: 'Article 3 SCOPE This Protocol shall apply to genetic resources'
+
+  # --- Concept: genetic resources ------------------------------------------
+  - src: concept:genetic_resources
+    relation: RELATES_TO
+    dst: doc:wipo-gratk-2024
+    evidence: 'WIPO TREATY ON INTELLECTUAL PROPERTY, GENETIC RESOURCES AND ASSOCIATED TRADITIONAL KNOWLEDGE'
+    note: GRATK - signed 24 May 2024, NOT yet in force.
+
+  - src: concept:genetic_resources
+    relation: RELATES_TO
+    dst: doc:wipo-nagoya-protocol-2010#3
+    evidence: 'Article 3 SCOPE This Protocol shall apply to genetic resources'
+
+  # --- Case law --------------------------------------------------------------
+  - src: doc:divya-pharmacy-v-uoi
+    relation: INTERPRETS
+    dst: doc:india-biological-diversity-act-2002#7
+    source_doc: divya-pharmacy-v-uoi
+    source_section: '106'
+    evidence: 'SBB has got powers to demand Fair and Equitable Benefit Sharing from the petitioner, in view of its statutory function given under Section 7'
+    note: Uttarakhand HC - SBB may demand FEBS from an Indian entity under s.7.
+
+  # --- Treaty / cross-jurisdiction links ---------------------------------------
+  - src: doc:wipo-nagoya-protocol-2010
+    relation: IMPLEMENTS
+    dst: doc:cbd-1992
+    source_doc: wipo-nagoya-protocol-2010
+    source_section: '4'
+    evidence: 'This Protocol is the instrument for the implementation of the access and benefit-sharing provisions of the Convention'
+
+  - src: doc:india-biological-diversity-act-2002
+    relation: IMPLEMENTS
+    dst: doc:cbd-1992
+    source_doc: india-biological-diversity-act-2002
+    source_section: null
+    evidence: 'India is a party to the United Nations Convention on Biological Diversity'
+    note: BD Act preamble (India -> international cross-edge; only followed when no jurisdiction is selected).
+
+  - src: doc:india-biological-diversity-amendment-act-2023
+    relation: IMPLEMENTS
+    dst: doc:wipo-nagoya-protocol-2010
+    source_doc: india-biological-diversity-amendment-act-2023
+    source_section: '2'
+    evidence: 'India is a Party to the Nagoya Protocol'
+    note: 2023 amendment to the BD Act preamble (cross-edge).
+
+# Candidates considered and REJECTED (kept out of the graph):
+#  - category:new_or_non_classical_drug -> any provision: no ASU-specific
+#    "new drug" text in the corpus (Rule 122-E defines new drug generally,
+#    not for ASU drugs) - not defensible.
+#  - category:cosmetic -> D&C Act s.3(aaa): definition exists but the
+#    chunk is mislabelled section "10" in the CDSCO compilation; citing
+#    "section 10" would be wrong.
+#  - concept:traditional_knowledge -> Patents Act s.64(1)(q) / s.64(1)(p)
+#    (revocation for anticipation by indigenous knowledge / non-disclosure
+#    of biological source): text exists but is mislabelled section "6".
+#  - concept:genetic_resources -> CBD Art. 15: text exists but is
+#    mislabelled "1"/"5" (paragraph numbers).
+#  - ip_type:plant_variety -> PPV&FR Act: not in the corpus.
+#  - ip_type:trade_secret: no statute exists / none in corpus.
+#  - category:ayurveda_aahara_or_nutraceutical -> Food Safety and Standards
+#    Act, 2006: parent Act not in the corpus.

@@ -5,8 +5,13 @@ CLAUDE.md's architecture section, plus a condense_query step ahead of it
 (the query-planner gap CLAUDE.md's "Known gaps" section flags as FR-10):
 
     condense_query -> classify_product -> route_jurisdiction ->
-    route_ip_type -> retrieve -> rerank -> reason_and_cite ->
-    validate_citations -> score_confidence -> escalate_if_needed
+    route_ip_type -> retrieve -> rerank -> expand_with_graph ->
+    reason_and_cite -> validate_citations -> score_confidence ->
+    escalate_if_needed
+
+expand_with_graph (app/kg) appends provisions the legal knowledge graph
+connects to the reranked set - real source_documents rows, so
+validate_citations needs no change.
 
 Split into CLASSIFY_NODES / REMAINING_NODES so a caller (chat/router.py's
 clarifying-question precheck) can run just enough to decide whether to
@@ -23,6 +28,7 @@ from typing import Awaitable, Callable
 from app.graph.nodes.classify_product import classify_product
 from app.graph.nodes.condense_query import condense_query
 from app.graph.nodes.escalate_if_needed import escalate_if_needed
+from app.graph.nodes.expand_with_graph import expand_with_graph
 from app.graph.nodes.reason_and_cite import reason_and_cite
 from app.graph.nodes.rerank import rerank
 from app.graph.nodes.retrieve import retrieve
@@ -44,6 +50,7 @@ REMAINING_NODES: list[Node] = [
     route_ip_type,
     retrieve,
     rerank,
+    expand_with_graph,
     reason_and_cite,
     validate_citations,
     score_confidence,

@@ -37,6 +37,10 @@ class GraphState(TypedDict, total=False):
     vector_candidates: list[RetrievedChunk]
     bm25_candidates: list[RetrievedChunk]
     reranked_chunks: list[RetrievedChunk]
+    # Set by expand_with_graph (app/kg/expand.py). Graph-appended chunks
+    # also carry via_graph=True / graph_via=<path> on the chunk dict itself.
+    graph_chunks: list[dict]  # {chunk_id, doc_id, section_or_article, relation, via}
+    related_provisions: list[dict]  # see app.chat.schemas.RelatedProvisionOut
 
     answer: str
     raw_citations: list[Citation]

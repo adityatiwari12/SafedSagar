@@ -719,3 +719,86 @@ class ComplianceItem(Base):
 
     product: Mapped["Product"] = relationship()
     updated_by_user: Mapped["User | None"] = relationship()
+
+
+# ---------------------------------------------------------------------------
+# Legal knowledge graph (app/kg). Built from source_documents by
+# `python -m app.kg.build` - see app/kg/build.py for the no-fabrication
+# rules every node/edge is checked against before insertion.
+# ---------------------------------------------------------------------------
+
+
+class KgNodeType(str, enum.Enum):
+    statute = "statute"
+    rules = "rules"  # rules AND regulations (subordinate legislation)
+    treaty = "treaty"
+    provision = "provision"
+    authority = "authority"
+    product_category = "product_category"
+    ip_type = "ip_type"
+    concept = "concept"
+    case = "case"
+    # guideline / manual / secondary_analysis / notification / registry
+    # data - ingested and citable, but NOT primary law, so never typed as
+    # a statute/rules node.
+    guidance = "guidance"
+
+
+class KgRelation(str, enum.Enum):
+    CONTAINS = "CONTAINS"
+    REFERS_TO = "REFERS_TO"
+    IMPLEMENTS = "IMPLEMENTS"
+    AMENDS = "AMENDS"
+    ADMINISTERED_BY = "ADMINISTERED_BY"
+    APPLIES_TO = "APPLIES_TO"
+    GOVERNED_BY = "GOVERNED_BY"
+    RELATES_TO = "RELATES_TO"
+    INTERPRETS = "INTERPRETS"
+
+
+class KgEdgeOrigin(str, enum.Enum):
+    structural = "structural"
+    extracted = "extracted"
+    curated = "curated"
+
+
+class KgNode(Base):
+    """A knowledge-graph node. Document/provision/authority nodes only
+    ever come from rows that exist in source_documents; category/ip_type/
+    concept nodes are jurisdiction-neutral taxonomy (jurisdiction NULL)."""
+
+    __tablename__ = "kg_nodes"
+    __table_args__ = (Index("ix_kg_nodes_doc_section", "doc_id", "section_or_article"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    node_type: Mapped[KgNodeType] = mapped_column(SAEnum(KgNodeType, name="kg_node_type"), nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    jurisdiction: Mapped[str | None] = mapped_column(String, nullable=True)
+    doc_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    section_or_article: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class KgEdge(Base):
+    """A directed, provenance-carrying relation between two KgNodes.
+    `source_doc_id` (+ `source_section` when set) always resolves to a
+    source_documents row - the builder rejects any edge where it doesn't.
+    `source_chunk_id` pins the exact chunk the evidence was found in."""
+
+    __tablename__ = "kg_edges"
+    __table_args__ = (
+        UniqueConstraint("src_id", "dst_id", "relation", name="ux_kg_edges_src_dst_rel"),
+        Index("ix_kg_edges_src", "src_id"),
+        Index("ix_kg_edges_dst", "dst_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    src_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("kg_nodes.id", ondelete="CASCADE"), nullable=False)
+    dst_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("kg_nodes.id", ondelete="CASCADE"), nullable=False)
+    relation: Mapped[KgRelation] = mapped_column(SAEnum(KgRelation, name="kg_relation"), nullable=False)
+    source_doc_id: Mapped[str] = mapped_column(String, nullable=False)
+    source_section: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_chunk_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    origin: Mapped[KgEdgeOrigin] = mapped_column(SAEnum(KgEdgeOrigin, name="kg_edge_origin"), nullable=False)
+    confidence: Mapped[float] = mapped_column(nullable=False)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -25,6 +25,7 @@ from app.chat.schemas import (
     ConversationSummaryOut,
     EscalateRequest,
     EscalateResponse,
+    RelatedProvisionOut,
 )
 from app.db.base import AsyncSessionLocal
 from app.db.models import (
@@ -63,6 +64,7 @@ NODE_TO_STEP = {
     "route_ip_type": "need",
     "retrieve": "need",
     "rerank": "need",
+    "expand_with_graph": "need",
     "reason_and_cite": "answer",
     "validate_citations": "answer",
     "score_confidence": "action",
@@ -552,6 +554,7 @@ async def _process_chat_turn(
         needs_human_review=outgoing.needs_human_review,
         timing_ms=state.get("node_timings"),
         answered_by=answered_by,
+        related_provisions=[RelatedProvisionOut(**r) for r in state.get("related_provisions") or []],
     )
 
     db.add(
