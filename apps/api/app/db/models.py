@@ -153,6 +153,37 @@ class ExpertReviewAction(str, enum.Enum):
     escalate = "escalate"
 
 
+class ComplianceArea(str, enum.Enum):
+    """A checklist area for a product's regulatory-compliance dossier
+    (Phase 10). Structural buckets only - which areas apply to a product
+    is derived from its product_classification by app.compliance.rules,
+    never hardcoded as a legal claim (CLAUDE.md: "Do not invent real
+    legal citations or government records")."""
+
+    classification = "classification"
+    manufacturing = "manufacturing"
+    ingredients = "ingredients"
+    safety_evidence = "safety_evidence"
+    labelling = "labelling"
+    claims = "claims"
+    advertising = "advertising"
+    licensing = "licensing"
+    food_requirements = "food_requirements"
+    cosmetic_requirements = "cosmetic_requirements"
+
+
+class ComplianceStatus(str, enum.Enum):
+    """A checklist item's status. Defaults to `unknown` everywhere it's
+    created - the system never asserts a product *is* compliant; only a
+    user (via PATCH) sets a non-default status."""
+
+    unknown = "unknown"
+    action_required = "action_required"
+    under_review = "under_review"
+    complete = "complete"
+    not_applicable = "not_applicable"
+
+
 class User(Base):
     """A platform user (end user, facilitator, or admin)."""
 
@@ -642,3 +673,49 @@ class Product(Base):
 
     owner: Mapped["User"] = relationship(foreign_keys=[owner_user_id])
     organization: Mapped["Organization | None"] = relationship()
+
+
+class ComplianceItem(Base):
+    """One checklist item for a Product's regulatory-compliance dossier
+    (Phase 10). `area` applicability and `applicability_reason` come from
+    app.compliance.rules.applicable_areas (structural, derived from
+    product_classification - never a legal claim). `status` defaults to
+    `unknown` and is only ever changed by a user via PATCH or by the
+    system marking an item `not_applicable` on reclassification - never
+    asserted `complete` automatically. `evidence` is only ever populated
+    by app.compliance.service.attach_evidence running the real retrieve/
+    rerank pipeline over `source_documents` - never hand-written.
+    """
+
+    __tablename__ = "compliance_items"
+    __table_args__ = (UniqueConstraint("product_id", "area", name="ux_compliance_item_product_area"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"), nullable=False, index=True)
+    area: Mapped[ComplianceArea] = mapped_column(SAEnum(ComplianceArea, name="compliance_area"), nullable=False)
+    status: Mapped[ComplianceStatus] = mapped_column(
+        SAEnum(ComplianceStatus, name="compliance_status"),
+        nullable=False,
+        server_default=ComplianceStatus.unknown.value,
+    )
+    applicability_reason: Mapped[str] = mapped_column(String, nullable=False)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    # list[{"doc_id": str, "section_or_article": str | None, "title": str,
+    # "authority": str, "source_url": str}] - only ever chunks that exist
+    # in source_documents at write time (attach_evidence verifies this the
+    # same way validate_citations does, not by trusting the retrieval
+    # pipeline blindly).
+    evidence: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    product: Mapped["Product"] = relationship()
+    updated_by_user: Mapped["User | None"] = relationship()

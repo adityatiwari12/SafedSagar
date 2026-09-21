@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_db
@@ -15,7 +15,7 @@ from app.authz.constants import Permission
 from app.authz.service import AuthzContext, can_access_resource, require_permission
 from app.cases.router import _to_case_out
 from app.cases.schemas import CaseOut
-from app.db.models import AuditLogEntry, Case, Product
+from app.db.models import AuditLogEntry, Case, ComplianceItem, Product
 from app.graph.state import PRODUCT_CATEGORIES
 from app.products.schemas import ProductCreate, ProductOut, ProductUpdate
 
@@ -199,6 +199,12 @@ async def delete_product(
     # so without this the delete raises a ForeignKeyViolationError (500)
     # for any product that has ever been assessed.
     await db.execute(update(Case).where(Case.product_id == product_id).values(product_id=None))
+
+    # A compliance checklist item has no meaning without its product (unlike
+    # a Case, which is an audit record of a question actually asked) - so
+    # cascade-delete rather than detach. Explicit DELETE, not a DB-level
+    # ON DELETE CASCADE, matching this codebase's explicit-in-code style.
+    await db.execute(delete(ComplianceItem).where(ComplianceItem.product_id == product_id))
 
     db.add(
         AuditLogEntry(
