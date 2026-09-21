@@ -133,6 +133,21 @@ Core User Journey (Section 7) — confirm/edit with your team before relying on 
 
 ## Explicitly out of scope for MVP
 
-Knowledge graph (PRD Phase 3), agentic multi-source orchestration (Phase 4), paid-source
-connectors (Phase 4), voice interface (Phase 5), automatic IP/regulatory filing. These are
-staged *after* the MVP in the source PRD itself — don't parallelize them in.
+Agentic multi-source orchestration (Phase 4), paid-source connectors (Phase 4), voice
+interface (Phase 5), automatic IP/regulatory filing. These are staged *after* the MVP in the
+source PRD itself — don't parallelize them in.
+
+**Knowledge graph (PRD Phase 3) is now in scope** — the retrieval MVP it was staged behind
+is built. Lives in `app/kg/` (Postgres `kg_nodes`/`kg_edges`, no separate graph service).
+The one rule that governs it: **every edge must cite a real `source_documents` row**, and
+nodes for statutes/provisions come only from the ingested corpus. The loader rejects
+unsourced edges and a test enforces it — a graph of legal relationships is the easiest
+place in this system to invent law, so don't relax this for coverage.
+
+## Known corpus gaps
+
+The problem statement requires these but they are **not ingested**, so the assistant can't
+answer from them and the graph has no nodes for them — add sources before promising
+coverage: Drugs and Magic Remedies (Objectionable Advertisements) Act, PPV&FR Act (plant
+varieties), Hague Agreement (designs), Ayurvedic Pharmacopoeia of India, export-market
+herbal regimes.

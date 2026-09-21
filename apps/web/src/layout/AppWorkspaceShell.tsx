@@ -131,8 +131,8 @@ export function AppWorkspaceShell({
       <div className="flex min-h-0 flex-1">
         <aside
           id="workspace-sidebar"
-          className={`shrink-0 border-r border-surface-border bg-white ${
-            navOpen ? 'fixed inset-y-0 left-0 z-40 flex w-64 flex-col pt-[7.5rem] shadow-float lg:static lg:pt-0 lg:shadow-none' : 'hidden lg:flex'
+          className={`shrink-0 flex-col border-r border-surface-border bg-white ${
+            navOpen ? 'fixed inset-y-0 left-0 z-40 flex w-64 pt-[7.5rem] shadow-float lg:static lg:pt-0 lg:shadow-none' : 'hidden lg:flex'
           } lg:w-56 xl:w-60`}
         >
           <nav aria-label="Workspace" className="scroll-thin flex-1 overflow-y-auto px-3 py-4">
