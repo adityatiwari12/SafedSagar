@@ -419,6 +419,30 @@ export type MessageTree = {
     haveAccount: string
     loginLink: string
   }
+  compliance: {
+    tabLabel: string
+    disclaimer: string
+    loading: string
+    retry: string
+    emptyTitle: string
+    emptyBodyGeneric: string
+    emptyBodyUnclassified: string
+    emptyBodyOutOfScope: string
+    classifyFirst: string
+    generate: string
+    generating: string
+    refresh: string
+    findEvidence: string
+    findingEvidence: string
+    evidenceHint: string
+    evidenceLabel: string
+    notesLabel: string
+    notesPlaceholder: string
+    saveNotes: string
+    statusLabel: string
+    summaryHeadline: string
+    viewSource: string
+  }
 }
 
 export type Messages = MessageTree

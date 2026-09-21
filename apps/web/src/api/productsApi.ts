@@ -53,6 +53,64 @@ export type ProductCreateInput = {
 
 export type ProductPatchInput = Partial<Omit<Product, 'id' | 'owner_user_id' | 'created_at' | 'updated_at'>>
 
+export const COMPLIANCE_AREAS = [
+  'classification',
+  'manufacturing',
+  'ingredients',
+  'safety_evidence',
+  'labelling',
+  'claims',
+  'advertising',
+  'licensing',
+  'food_requirements',
+  'cosmetic_requirements',
+] as const
+
+export type ComplianceArea = (typeof COMPLIANCE_AREAS)[number]
+
+export const COMPLIANCE_STATUSES = [
+  'unknown',
+  'action_required',
+  'under_review',
+  'complete',
+  'not_applicable',
+] as const
+
+export type ComplianceStatus = (typeof COMPLIANCE_STATUSES)[number]
+
+export interface ComplianceEvidence {
+  doc_id: string
+  section_or_article?: string | null
+  title: string
+  authority: string
+  source_url?: string | null
+}
+
+export interface ComplianceItem {
+  id: string
+  product_id: string
+  area: ComplianceArea
+  status: ComplianceStatus
+  applicability_reason: string
+  notes?: string | null
+  evidence?: ComplianceEvidence[] | null
+  updated_by_user_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ComplianceSummary = Record<ComplianceStatus, number> & { total: number }
+
+export interface ComplianceChecklist {
+  items: ComplianceItem[]
+  summary: ComplianceSummary
+}
+
+export type ComplianceItemPatch = {
+  status?: ComplianceStatus
+  notes?: string | null
+}
+
 export const productsApi = {
   list(): Promise<Product[]> {
     return apiFetch<Product[]>('/products', {}, getStoredToken())
@@ -80,9 +138,53 @@ export const productsApi = {
   getCases(id: string): Promise<CaseItem[]> {
     return apiFetch<CaseItem[]>(`/products/${id}/cases`, {}, getStoredToken())
   },
+  getCompliance(id: string): Promise<ComplianceChecklist> {
+    return apiFetch<ComplianceChecklist>(`/products/${id}/compliance`, {}, getStoredToken())
+  },
+  generateCompliance(id: string, withEvidence = false): Promise<ComplianceChecklist> {
+    return apiFetch<ComplianceChecklist>(
+      `/products/${id}/compliance?with_evidence=${withEvidence ? 'true' : 'false'}`,
+      { method: 'POST' },
+      getStoredToken(),
+    )
+  },
+  updateComplianceItem(
+    productId: string,
+    itemId: string,
+    patch: ComplianceItemPatch,
+  ): Promise<ComplianceItem> {
+    return apiFetch<ComplianceItem>(
+      `/products/${productId}/compliance/${itemId}`,
+      { method: 'PATCH', body: JSON.stringify(patch) },
+      getStoredToken(),
+    )
+  },
 }
 
 export function humanizeClassification(value: string | null | undefined): string {
   if (!value) return 'Unclassified'
   return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+export function humanizeArea(area: string): string {
+  return area.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/** Recomputes the per-status summary from a checklist's items — used after
+ * an optimistic PATCH so the summary strip never drifts from the rows
+ * actually on screen, instead of trusting a server summary that may be
+ * stale relative to a local edit still in flight. */
+export function summarizeCompliance(items: ComplianceItem[]): ComplianceSummary {
+  const summary = {
+    unknown: 0,
+    action_required: 0,
+    under_review: 0,
+    complete: 0,
+    not_applicable: 0,
+    total: items.length,
+  } as ComplianceSummary
+  for (const item of items) {
+    summary[item.status] += 1
+  }
+  return summary
 }

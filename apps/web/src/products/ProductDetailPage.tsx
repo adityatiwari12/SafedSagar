@@ -4,6 +4,7 @@ import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { ApiError } from '../api/http'
 import { CaseItem } from '../api/casesApi'
 import { StatusBadge as CaseStatusBadge, RiskBadge } from '../cases/caseBadges'
+import { useLanguage } from '../i18n/LanguageContext'
 import {
   EmptyState,
   ErrorState,
@@ -13,22 +14,43 @@ import {
   StatusBadge,
 } from '../ui/primitives'
 import {
+  ComplianceEvidence,
+  ComplianceItem,
+  ComplianceItemPatch,
+  ComplianceStatus,
+  ComplianceSummary,
+  COMPLIANCE_STATUSES,
+  humanizeArea,
   humanizeClassification,
   PRODUCT_CLASSIFICATIONS,
   Product,
   ProductClassification,
   productsApi,
+  summarizeCompliance,
 } from '../api/productsApi'
 
-type TabId = 'overview' | 'formulation' | 'classification' | 'pathways' | 'assessments'
+type TabId = 'overview' | 'formulation' | 'classification' | 'pathways' | 'compliance' | 'assessments'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'formulation', label: 'Formulation' },
   { id: 'classification', label: 'Classification' },
   { id: 'pathways', label: 'Pathways' },
+  { id: 'compliance', label: 'Compliance' },
   { id: 'assessments', label: 'Assessments' },
 ]
+
+const COMPLIANCE_STATUS_TONE: Record<ComplianceStatus, string> = {
+  unknown: 'draft',
+  action_required: 'open',
+  under_review: 'in_progress',
+  complete: 'resolved',
+  not_applicable: 'draft',
+}
+
+function complianceStatusLabel(statusValue: ComplianceStatus): string {
+  return statusValue.replace(/_/g, ' ')
+}
 
 const PLANNED_MODULES = [
   'IP Strategy',
@@ -489,6 +511,255 @@ function PathwaysTab({ product }: { product: Product }) {
   )
 }
 
+function ComplianceSummaryStrip({ summary }: { summary: ComplianceSummary }) {
+  const { t } = useLanguage()
+  const headline = t('compliance.summaryHeadline')
+    .replace('{complete}', String(summary.complete))
+    .replace('{total}', String(summary.total))
+  const breakdown = COMPLIANCE_STATUSES.filter((s) => s !== 'complete' && summary[s] > 0)
+  return (
+    <div className="flex flex-wrap items-center gap-2 border border-surface-border bg-ivory/50 px-3 py-2">
+      <StatusBadge status={COMPLIANCE_STATUS_TONE.complete} label={headline} />
+      {breakdown.map((s) => (
+        <StatusBadge
+          key={s}
+          status={COMPLIANCE_STATUS_TONE[s]}
+          label={`${complianceStatusLabel(s)} · ${summary[s]}`}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ComplianceEvidenceSection({ evidence }: { evidence: ComplianceEvidence[] | null | undefined }) {
+  const { t } = useLanguage()
+  if (!evidence || evidence.length === 0) return null
+  return (
+    <div className="border-t border-surface-border pt-2">
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        {t('compliance.evidenceLabel')}
+      </p>
+      <ul className="mt-1.5 space-y-1.5">
+        {evidence.map((e, i) => (
+          <li key={`${e.doc_id}-${i}`} className="text-xs text-ink-muted">
+            <span className="font-semibold text-ink">{e.title}</span>
+            {' — '}
+            {[e.authority, e.section_or_article].filter(Boolean).join(' · ')}
+            {e.source_url && (
+              <>
+                {' · '}
+                <a
+                  href={e.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-forest underline-offset-2 hover:underline"
+                >
+                  {t('compliance.viewSource')}
+                </a>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ComplianceItemRow({
+  item,
+  onUpdate,
+}: {
+  item: ComplianceItem
+  onUpdate: (itemId: string, patch: ComplianceItemPatch) => void
+}) {
+  const { t } = useLanguage()
+  const [notesDraft, setNotesDraft] = useState(item.notes ?? '')
+  const [notesDirty, setNotesDirty] = useState(false)
+
+  useEffect(() => {
+    if (!notesDirty) setNotesDraft(item.notes ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.notes, notesDirty])
+
+  return (
+    <article className="space-y-3 border border-surface-border bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-bold text-navy">{humanizeArea(item.area)}</h3>
+            <StatusBadge
+              status={COMPLIANCE_STATUS_TONE[item.status]}
+              label={complianceStatusLabel(item.status)}
+            />
+          </div>
+          <p className="mt-1 text-xs text-ink-muted">{item.applicability_reason}</p>
+        </div>
+        <div className="shrink-0">
+          <label className="sr-only" htmlFor={`compliance-status-${item.id}`}>
+            {t('compliance.statusLabel')}
+          </label>
+          <select
+            id={`compliance-status-${item.id}`}
+            className="gov-input !py-1 text-xs"
+            value={item.status}
+            onChange={(e) => onUpdate(item.id, { status: e.target.value as ComplianceStatus })}
+          >
+            {COMPLIANCE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {complianceStatusLabel(s)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="gov-label" htmlFor={`compliance-notes-${item.id}`}>
+          {t('compliance.notesLabel')}
+        </label>
+        <textarea
+          id={`compliance-notes-${item.id}`}
+          className="gov-input"
+          rows={2}
+          placeholder={t('compliance.notesPlaceholder')}
+          value={notesDraft}
+          onChange={(e) => {
+            setNotesDraft(e.target.value)
+            setNotesDirty(true)
+          }}
+        />
+        {notesDirty && (
+          <button
+            type="button"
+            className="gov-btn-secondary mt-1 !py-1 text-xs"
+            onClick={() => {
+              onUpdate(item.id, { notes: notesDraft.trim() || null })
+              setNotesDirty(false)
+            }}
+          >
+            {t('compliance.saveNotes')}
+          </button>
+        )}
+      </div>
+      <ComplianceEvidenceSection evidence={item.evidence} />
+    </article>
+  )
+}
+
+function ComplianceTab({
+  product,
+  items,
+  loading,
+  error,
+  generating,
+  evidenceLoading,
+  actionError,
+  onRetry,
+  onGenerate,
+  onUpdateItem,
+}: {
+  product: Product
+  items: ComplianceItem[] | null
+  loading: boolean
+  error: string | null
+  generating: boolean
+  evidenceLoading: boolean
+  actionError: string | null
+  onRetry: () => void
+  onGenerate: (withEvidence: boolean) => void
+  onUpdateItem: (itemId: string, patch: ComplianceItemPatch) => void
+}) {
+  const { t } = useLanguage()
+
+  if (loading) return <LoadingState label={t('compliance.loading')} />
+  if (error) {
+    return (
+      <div>
+        <ErrorState message={error} />
+        <button type="button" className="gov-btn-secondary mt-2 !py-1 text-xs" onClick={onRetry}>
+          {t('compliance.retry')}
+        </button>
+      </div>
+    )
+  }
+
+  const summary = summarizeCompliance(items ?? [])
+  const isEmpty = !items || items.length === 0
+  const classification = product.product_classification
+
+  const emptyDescription =
+    !classification || classification === 'unclear'
+      ? t('compliance.emptyBodyUnclassified')
+      : classification === 'out_of_scope'
+        ? t('compliance.emptyBodyOutOfScope')
+        : t('compliance.emptyBodyGeneric')
+
+  return (
+    <div className="space-y-4">
+      <p className="border border-saffron/50 bg-orange-50 px-3 py-2 text-xs text-ink">
+        {t('compliance.disclaimer')}
+      </p>
+
+      {actionError && <ErrorState message={actionError} />}
+
+      {isEmpty ? (
+        <EmptyState
+          title={t('compliance.emptyTitle')}
+          description={emptyDescription}
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="gov-btn-primary"
+                onClick={() => onGenerate(false)}
+                disabled={generating}
+              >
+                {generating ? t('compliance.generating') : t('compliance.generate')}
+              </button>
+              {(!classification || classification === 'unclear') && (
+                <Link to="/classify" className="gov-btn-secondary">
+                  {t('compliance.classifyFirst')}
+                </Link>
+              )}
+            </div>
+          }
+        />
+      ) : (
+        <>
+          <ComplianceSummaryStrip summary={summary} />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              className="gov-btn-secondary !py-1.5 text-sm"
+              onClick={() => onGenerate(false)}
+              disabled={generating}
+            >
+              {generating ? t('compliance.generating') : t('compliance.refresh')}
+            </button>
+            <button
+              type="button"
+              className="gov-btn-secondary !py-1.5 text-sm"
+              onClick={() => onGenerate(true)}
+              disabled={evidenceLoading}
+            >
+              {evidenceLoading ? t('compliance.findingEvidence') : t('compliance.findEvidence')}
+            </button>
+          </div>
+          {evidenceLoading && (
+            <p className="text-xs text-ink-muted" role="status">
+              {t('compliance.evidenceHint')}
+            </p>
+          )}
+          <div className="space-y-3">
+            {items!.map((item) => (
+              <ComplianceItemRow key={item.id} item={item} onUpdate={onUpdateItem} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function AssessmentCard({ item }: { item: CaseItem }) {
   return (
     <article className="space-y-2 border border-surface-border bg-white p-4">
@@ -783,6 +1054,12 @@ export default function ProductDetailPage() {
   const [cases, setCases] = useState<CaseItem[] | null>(null)
   const [casesLoading, setCasesLoading] = useState(true)
   const [casesError, setCasesError] = useState<string | null>(null)
+  const [complianceItems, setComplianceItems] = useState<ComplianceItem[] | null>(null)
+  const [complianceLoading, setComplianceLoading] = useState(true)
+  const [complianceError, setComplianceError] = useState<string | null>(null)
+  const [complianceGenerating, setComplianceGenerating] = useState(false)
+  const [complianceEvidenceLoading, setComplianceEvidenceLoading] = useState(false)
+  const [complianceActionError, setComplianceActionError] = useState<string | null>(null)
 
   async function load() {
     if (!id) return
@@ -825,6 +1102,60 @@ export default function ProductDetailPage() {
     if (product?.id) void loadCases(product.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id])
+
+  async function loadCompliance(productId: string) {
+    setComplianceLoading(true)
+    setComplianceError(null)
+    try {
+      const data = await productsApi.getCompliance(productId)
+      setComplianceItems(data.items)
+    } catch (err) {
+      setComplianceError(
+        err instanceof ApiError ? err.message : 'Failed to load compliance checklist',
+      )
+    } finally {
+      setComplianceLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (product?.id) void loadCompliance(product.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id])
+
+  async function handleGenerateCompliance(withEvidence: boolean) {
+    if (!product) return
+    setComplianceActionError(null)
+    if (withEvidence) setComplianceEvidenceLoading(true)
+    else setComplianceGenerating(true)
+    try {
+      const data = await productsApi.generateCompliance(product.id, withEvidence)
+      setComplianceItems(data.items)
+    } catch (err) {
+      setComplianceActionError(
+        err instanceof ApiError ? err.message : 'Failed to generate compliance checklist',
+      )
+    } finally {
+      if (withEvidence) setComplianceEvidenceLoading(false)
+      else setComplianceGenerating(false)
+    }
+  }
+
+  async function handleUpdateComplianceItem(itemId: string, patch: ComplianceItemPatch) {
+    if (!product || !complianceItems) return
+    const previous = complianceItems
+    setComplianceActionError(null)
+    setComplianceItems(previous.map((i) => (i.id === itemId ? { ...i, ...patch } : i)))
+    try {
+      const updated = await productsApi.updateComplianceItem(product.id, itemId, patch)
+      setComplianceItems((cur) => (cur ? cur.map((i) => (i.id === itemId ? updated : i)) : cur))
+    } catch (err) {
+      setComplianceItems(previous)
+      setComplianceActionError(
+        err instanceof ApiError ? err.message : 'Failed to update checklist item',
+      )
+    }
+  }
 
   const latestCase = cases?.[0] ?? null
 
@@ -912,6 +1243,20 @@ export default function ProductDetailPage() {
               {tab === 'formulation' && <FormulationTab product={product} />}
               {tab === 'classification' && <ClassificationTab product={product} />}
               {tab === 'pathways' && <PathwaysTab product={product} />}
+              {tab === 'compliance' && (
+                <ComplianceTab
+                  product={product}
+                  items={complianceItems}
+                  loading={complianceLoading}
+                  error={complianceError}
+                  generating={complianceGenerating}
+                  evidenceLoading={complianceEvidenceLoading}
+                  actionError={complianceActionError}
+                  onRetry={() => void loadCompliance(product.id)}
+                  onGenerate={(withEvidence) => void handleGenerateCompliance(withEvidence)}
+                  onUpdateItem={(itemId, patch) => void handleUpdateComplianceItem(itemId, patch)}
+                />
+              )}
               {tab === 'assessments' && (
                 <AssessmentsTab
                   product={product}

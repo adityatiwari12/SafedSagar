@@ -440,4 +440,33 @@ export const en: Messages = {
     haveAccount: 'Already have an account?',
     loginLink: 'Login',
   },
+  compliance: {
+    tabLabel: 'Compliance',
+    disclaimer:
+      'This checklist is not a legal determination. Statuses are your own tracking — nothing here is marked complete automatically.',
+    loading: 'Loading compliance checklist…',
+    retry: 'Retry',
+    emptyTitle: 'No compliance checklist yet',
+    emptyBodyGeneric:
+      'Applicable checklist areas are derived from this product’s classification.',
+    emptyBodyUnclassified:
+      'This product has not been classified yet, so generating a checklist now will only produce the areas that always apply. Classify this product first for the full checklist.',
+    emptyBodyOutOfScope:
+      'This product is classified as out of scope, so no compliance checklist areas apply.',
+    classifyFirst: 'Classify this product',
+    generate: 'Generate checklist',
+    generating: 'Generating…',
+    refresh: 'Refresh checklist',
+    findEvidence: 'Find supporting sources',
+    findingEvidence: 'Finding sources…',
+    evidenceHint:
+      'Retrieving related source text for each checklist item — this can take up to about 40 seconds.',
+    evidenceLabel: 'Related source text — retrieved as relevant, not verified as the governing requirement.',
+    notesLabel: 'Notes',
+    notesPlaceholder: 'Add your own tracking notes…',
+    saveNotes: 'Save notes',
+    statusLabel: 'Status',
+    summaryHeadline: '{complete} of {total} complete',
+    viewSource: 'View source',
+  },
 }
