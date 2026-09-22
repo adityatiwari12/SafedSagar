@@ -115,6 +115,16 @@ async def get_product(
     return product
 
 
+async def _fetch_product_cases(db: AsyncSession, product_id: uuid.UUID) -> list[Case]:
+    """Cases (chat turns) linked to a product, most recent first. Split out
+    from get_product_cases so other modules (e.g. app.reports.router's PDF
+    export) can reuse the same query instead of re-deriving it."""
+    result = await db.execute(
+        select(Case).where(Case.product_id == product_id).order_by(Case.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 @router.get("/{product_id}/cases", response_model=list[CaseOut])
 async def get_product_cases(
     product_id: uuid.UUID,
@@ -130,10 +140,7 @@ async def get_product_cases(
     if not can_access_resource(ctx, product):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your product")
 
-    result = await db.execute(
-        select(Case).where(Case.product_id == product_id).order_by(Case.created_at.desc())
-    )
-    cases = list(result.scalars().all())
+    cases = await _fetch_product_cases(db, product_id)
     return [await _to_case_out(db, c) for c in cases]
 
 

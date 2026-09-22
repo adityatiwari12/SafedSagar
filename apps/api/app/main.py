@@ -12,6 +12,7 @@ from app.compliance.router import router as compliance_router
 from app.documents.router import router as documents_router
 from app.products.router import router as products_router
 from app.query.router import router as query_router
+from app.reports.router import router as reports_router
 from app.translation.router import router as translation_router
 
 app = FastAPI(title="IP-SAKTI Sahayak API")
@@ -40,6 +41,7 @@ app.include_router(products_router)
 app.include_router(compliance_router)
 app.include_router(abs_router)
 app.include_router(documents_router)
+app.include_router(reports_router)
 app.include_router(admin_router)
 app.include_router(translation_router)
 

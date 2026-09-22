@@ -27,6 +27,7 @@ dependencies = [
     "rank-bm25==0.2.2",
     "py3langid==0.4.0",
     "pyyaml==6.0.3",
+    "fpdf2==2.8.2",
 ]
 # Deliberately NOT using the `langgraph` package: it pulls langchain-core,
 # which pulls uuid_utils (a Rust native extension) - blocked outright by
