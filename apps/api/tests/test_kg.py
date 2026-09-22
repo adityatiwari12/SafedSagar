@@ -130,7 +130,13 @@ async def test_no_node_for_doc_absent_from_corpus():
                               WHERE s.doc_id = n.doc_id AND s.section_or_article = n.section_or_article)
         """))
         # Laws known to be missing from the corpus must not get nodes.
-        for missing in ("magic remedies", "plant varieties", "hague", "pharmacopoeia"):
+        # Drugs and Magic Remedies Act, PPV&FR Act, and the Hague Geneva
+        # Act were ingested (ingestion/source_registry.yaml,
+        # 2026-09-22) - removed from this list because they now
+        # legitimately have nodes, not because this check was relaxed.
+        # Pharmacopoeia is still genuinely absent (no accessible official
+        # source found yet) and stays covered.
+        for missing in ("pharmacopoeia",):
             n = await session.scalar(
                 select(func.count()).select_from(KgNode)
                 .where(KgNode.node_type.in_([KgNodeType.statute, KgNodeType.rules, KgNodeType.treaty]))
