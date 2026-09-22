@@ -652,3 +652,60 @@ sources:
     last_verified_date: "2026-09-15"
     fetch: false
     notes: "Documents real prior-art/bio-piracy-prevention case outcomes attributed to TKDL's existence - directly supports FR-09's 'TKDL prior-art likely exists, contact CSIR-TKDL' pointer framing."
+
+  # --- Wave D (2026-09-22): closing named CLAUDE.md corpus gaps - Drugs and
+  # Magic Remedies Act (Ayurvedic advertising claims), PPV&FR Act (plant
+  # variety protection/cultivators), Hague Agreement (international
+  # designs). Every URL below was fetched and its extracted text checked
+  # against the title/section-1 text before being registered - see commit
+  # notes for URLs tried and rejected (indiacode.nic.in/.gov.in both
+  # unreachable direct - 504/SPA; cdn.ayush.gov.in does not resolve at all
+  # from this environment).
+
+  - doc_id: india-drugs-magic-remedies-act-1954
+    title: "The Drugs and Magic Remedies (Objectionable Advertisements) Act, 1954"
+    authority: "Ministry of Health and Family Welfare (India) / Central Drugs Standard Control Organisation (CDSCO)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "http://web.archive.org/web/20240331182415/https://www.indiacode.nic.in/bitstream/123456789/19159/1/drugs_and_magic_remedies_act_1954.pdf"
+    format: pdf
+    version: "act-no-21-of-1954"
+    effective_date: "1955-04-01"
+    last_verified_date: "2026-09-22"
+    notes: "Prohibits advertisements for drugs/'magic remedies' claiming to cure specified diseases (ss.3-5) - directly covers Ayurvedic product advertising claims, a named corpus gap in CLAUDE.md. Commencement date (1 Apr 1955) taken from the Act's own footnote 2 (S.R.O. 511, Gazette of India 1955 Part II s.3), not recollection. indiacode.nic.in/.gov.in both fail direct fetch from this environment (504 Gateway Timeout / JS SPA shell); Wayback Machine capture (2024-03-31) of the same India Code bitstream PDF used instead, matching this file's established fallback pattern for dead indiacode links. Its Rules, 1955 were NOT added this wave - no officially-hosted, directly-fetchable copy was found (indiacode's own Rules URL also 504s, no Wayback capture exists for it); see ingestion completion notes for the one non-official mirror found."
+
+  - doc_id: india-ppvfr-act-2001
+    title: "The Protection of Plant Varieties and Farmers' Rights Act, 2001"
+    authority: "Protection of Plant Varieties and Farmers' Rights Authority / Ministry of Agriculture and Farmers Welfare (India)"
+    jurisdiction: india
+    doc_type: statute
+    source_url: "http://web.archive.org/web/20250925203733/https://www.indiacode.nic.in/bitstream/123456789/1909/1/A2001-53.pdf"
+    format: pdf
+    version: "act-no-53-of-2001"
+    effective_date: null
+    last_verified_date: "2026-09-22"
+    notes: "Plant-variety and farmers' rights protection, relevant to cultivators - a named corpus gap in CLAUDE.md. Received Presidential assent 30 October 2001 (confirmed from the Act's own title block); actual commencement was by staged Central Government notification and is not stated as a single date in this text, so effective_date is left null rather than guessed. indiacode.nic.in/.gov.in both fail direct fetch from this environment (504 Gateway Timeout / JS SPA shell); Wayback Machine capture (2025-09-25, current) of the same India Code bitstream PDF used instead."
+
+  - doc_id: india-ppvfr-rules-2003
+    title: "The Protection of Plant Varieties and Farmers' Rights Rules, 2003"
+    authority: "Protection of Plant Varieties and Farmers' Rights Authority / Ministry of Agriculture and Farmers Welfare (India)"
+    jurisdiction: india
+    doc_type: rules
+    source_url: "https://plantauthority.gov.in/sites/default/files/ppvfrarules2003.pdf"
+    format: pdf
+    version: "2003"
+    effective_date: null
+    last_verified_date: "2026-09-22"
+    notes: "Directly fetched (200 OK, application/pdf) from the PPV&FR Authority's own official website; opening text confirmed as 'THE PROTECTION OF PLANT VARIETIES AND FARMERS' RIGHTS RULES, 2003', made under s.96 of the Act above. Rules commence 'on the date on which the Act shall come into force' per their own text (s.1(2)) - tied to the Act's staged commencement, so left null rather than guessed; see india-ppvfr-act-2001 notes."
+
+  - doc_id: wipo-hague-geneva-act-1999
+    title: "Geneva Act (1999) of the Hague Agreement Concerning the International Registration of Industrial Designs"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wipo.int/edocs/mdocs/diplconf/en/h_dc/h_dc_40.pdf"
+    format: pdf
+    version: "1999-07-02-adopted"
+    effective_date: "2003-12-23"
+    last_verified_date: "2026-09-22"
+    notes: "WIPO Diplomatic Conference document H/DC/40 - the Geneva Act text as adopted by the Diplomatic Conference on 2 July 1999 (confirmed from the document's own title page), together with its Regulations and the Conference's agreed statements. Entry-into-force date (23 Dec 2003, three months after the sixth qualifying ratification/accession per Geneva Act Art.28(2)) is well documented externally (WIPO Hague System pages, Congress.gov treaty record) but is not itself stated in this adoption-conference document, so it is recorded here as background rather than re-derived from this PDF's text. wipo.int/edocs/pubdocs/en/designs/453/wipo_pub_453.pdf (an earlier candidate URL) 404s; WIPO Pub. 269 (wipo_pub_269_2019.pdf) is a valid alternative official consolidated text but bundles the Geneva Act together with the 1960 Hague Act and 1967 Stockholm Complementary Act in one PDF, which would blur section-citation boundaries between three different treaty instruments - H/DC/40 is Geneva-Act-only and was preferred for citation cleanliness."
