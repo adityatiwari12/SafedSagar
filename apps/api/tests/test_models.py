@@ -175,7 +175,14 @@ async def test_case_and_expert_review_round_trip():
 
 @pytest.mark.asyncio
 async def test_source_document_round_trip():
-    doc_id = f"ipindia-patents-act-1970-{uuid.uuid4().hex[:8]}"
+    # doc_id is namespaced "test-fixture-*", not a real-corpus-shaped id
+    # (e.g. "ipindia-patents-act-1970-<hex>") - the row is also deleted at
+    # the end of the test. A prior version used a real-looking doc_id and
+    # never cleaned it up: it accumulated one stray row in the shared dev
+    # Postgres on every test run (51 and counting by the time this was
+    # caught), which the knowledge graph's fragment-canonicalization logic
+    # then picked up as if it were real corpus data on every rebuild.
+    doc_id = f"test-fixture-source-document-{uuid.uuid4().hex[:8]}"
     chunk_id = f"{doc_id}#s3p"
     async with AsyncSessionLocal() as session:
         doc = SourceDocument(
@@ -195,13 +202,20 @@ async def test_source_document_round_trip():
         session.add(doc)
         await session.commit()
 
-    async with AsyncSessionLocal() as session:
-        fetched = await session.get(SourceDocument, chunk_id)
-        assert fetched is not None
-        assert fetched.doc_id == doc_id
-        assert fetched.title == "The Patents Act, 1970 - Section 3(p)"
-        assert fetched.jurisdiction == Jurisdiction.india
-        assert fetched.doc_type == "statute"
+    try:
+        async with AsyncSessionLocal() as session:
+            fetched = await session.get(SourceDocument, chunk_id)
+            assert fetched is not None
+            assert fetched.doc_id == doc_id
+            assert fetched.title == "The Patents Act, 1970 - Section 3(p)"
+            assert fetched.jurisdiction == Jurisdiction.india
+            assert fetched.doc_type == "statute"
+    finally:
+        async with AsyncSessionLocal() as session:
+            row = await session.get(SourceDocument, chunk_id)
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
         assert fetched.effective_date == date(1972, 4, 20)
         assert fetched.version == "2024-consolidated"
         assert fetched.section_or_article == "Section 3(p)"
