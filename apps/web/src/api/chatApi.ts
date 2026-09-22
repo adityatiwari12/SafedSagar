@@ -45,6 +45,27 @@ export interface ChatTurnResponse {
   canonical_answer?: string | null
   translation_status?: 'not_needed' | 'verified' | 'failed' | 'unavailable'
   needs_human_review?: boolean
+  // Provenance of the LLM call that produced this answer - additive, not
+  // present on every historical row (e.g. out-of-scope short-circuits
+  // never call an LLM, so this comes back null there).
+  answered_by?: { provider: string; model: string; fallback_used: boolean } | null
+  // Knowledge-graph neighbourhood of the cited evidence - adjacent legal
+  // context the answer did not necessarily cite. Never conflate with
+  // `citations` above: those are what the answer actually drew on.
+  related_provisions?: RelatedProvision[]
+  // True when this turn's reasoning drew on earlier messages in the same
+  // conversation (condense_query folded prior context into the query).
+  used_conversation_context?: boolean
+}
+
+export interface RelatedProvision {
+  doc_id: string
+  title: string
+  section_or_article?: string | null
+  jurisdiction: 'india' | 'international'
+  relation: string
+  via: string
+  source_url?: string | null
 }
 
 // Matches chat/router.py's NODE_TO_STEP values - the JourneyStepper step

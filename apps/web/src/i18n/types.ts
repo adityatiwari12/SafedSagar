@@ -401,6 +401,17 @@ export type MessageTree = {
     limitEscalate: string
     limitDisclaimer: string
     escalationHint: string
+    consideredContext: string
+    sectionAssessment: string
+    sectionAttention: string
+    sectionRelatedProvisions: string
+    relatedProvisionsHint: string
+    connectedThrough: string
+    relatedSourceLink: string
+    relatedProvisionsMore: string
+    relatedProvisionsShowLess: string
+    answeredBy: string
+    answeredByFallback: string
   }
   auth: {
     loginTitle: string

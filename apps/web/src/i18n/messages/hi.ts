@@ -420,6 +420,19 @@ export const hi: Messages = {
       'केवल सूचनात्मक मार्गदर्शन — फाइलिंग आधिकारिक राजपत्र और सक्षम प्राधिकारियों से पुष्टि करें।',
     escalationHint:
       'विश्वास अपर्याप्त होने पर मूल्यांकन पैनल में मानव IP सुविधाकर्ता से बात करें।',
+    consideredContext: 'इस बातचीत में पहले की जानकारी पर आधारित।',
+    sectionAssessment: 'मूल्यांकन',
+    sectionAttention: 'आपके ध्यान की आवश्यकता',
+    sectionRelatedProvisions: 'संबंधित प्रावधान',
+    relatedProvisionsHint:
+      'ज्ञान ग्राफ़ के माध्यम से जुड़ा — संबंधित संदर्भ, जरूरी नहीं कि ऊपर के उत्तर में उद्धृत हो।',
+    connectedThrough: 'इसके माध्यम से जुड़ा',
+    relatedSourceLink: 'स्रोत देखें',
+    relatedProvisionsMore: '+{count} और',
+    relatedProvisionsShowLess: 'कम दिखाएँ',
+    answeredBy: '{provider} · {model} द्वारा उत्तर दिया गया',
+    answeredByFallback:
+      'प्राथमिक क्लाउड मॉडल अनुपलब्ध था — इस उत्तर के लिए स्थानीय फॉलबैक मॉडल का उपयोग किया गया।',
   },
   auth: {
     loginTitle: 'लॉगिन',

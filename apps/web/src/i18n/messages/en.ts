@@ -421,6 +421,19 @@ export const en: Messages = {
       'Informational guidance only — confirm filings against official gazettes and competent authorities.',
     escalationHint:
       'Use Talk to a human IP facilitator in the assessment panel when confidence is insufficient.',
+    consideredContext: 'Building on earlier in this conversation.',
+    sectionAssessment: 'Assessment',
+    sectionAttention: 'Needs your attention',
+    sectionRelatedProvisions: 'Related provisions',
+    relatedProvisionsHint:
+      'Connected through the knowledge graph — adjacent context, not necessarily cited in the answer above.',
+    connectedThrough: 'Connected through',
+    relatedSourceLink: 'View source',
+    relatedProvisionsMore: '+{count} more',
+    relatedProvisionsShowLess: 'Show less',
+    answeredBy: 'Answered by {provider} · {model}',
+    answeredByFallback:
+      'The primary cloud model was unavailable — this answer used the local fallback model.',
   },
   auth: {
     loginTitle: 'Login',
