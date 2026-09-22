@@ -709,3 +709,136 @@ sources:
     effective_date: "2003-12-23"
     last_verified_date: "2026-09-22"
     notes: "WIPO Diplomatic Conference document H/DC/40 - the Geneva Act text as adopted by the Diplomatic Conference on 2 July 1999 (confirmed from the document's own title page), together with its Regulations and the Conference's agreed statements. Entry-into-force date (23 Dec 2003, three months after the sixth qualifying ratification/accession per Geneva Act Art.28(2)) is well documented externally (WIPO Hague System pages, Congress.gov treaty record) but is not itself stated in this adoption-conference document, so it is recorded here as background rather than re-derived from this PDF's text. wipo.int/edocs/pubdocs/en/designs/453/wipo_pub_453.pdf (an earlier candidate URL) 404s; WIPO Pub. 269 (wipo_pub_269_2019.pdf) is a valid alternative official consolidated text but bundles the Geneva Act together with the 1960 Hague Act and 1967 Stockholm Complementary Act in one PDF, which would blur section-citation boundaries between three different treaty instruments - H/DC/40 is Geneva-Act-only and was preferred for citation cleanliness."
+
+  # --- Wave E (2026-09-23): corpus expansion for grounding coverage -
+  # Ayurvedic Pharmacopoeia (prior attempts hit cdn.ayush.gov.in DNS
+  # failure / pcimh.gov.in 404s; archive.org's own catalog, not a Wayback
+  # capture, hosts a Government-of-India-credited scan independently),
+  # CCRAS research/clinical guidelines (ccras.nic.in direct, fetchable),
+  # Locarno Agreement (design classification, complements the Hague Geneva
+  # Act and Designs Act already in corpus), and six hand-picked Indian
+  # Kanoon landmark cases in the Ayurveda/TK/ABS/GI/patent-of-traditional-
+  # formulation space (Divya Pharmacy v UoI was previously the only case
+  # in the corpus). Every URL below was fetched directly (200, correct
+  # content-type) and its extracted opening text checked against the
+  # expected title/parties before being registered.
+
+  - doc_id: india-ayurvedic-pharmacopoeia-bundle
+    title: "The Ayurvedic Pharmacopoeia of India (combined volumes scan)"
+    authority: "Government of India, Ministry of Health and Family Welfare / Ayurvedic Pharmacopoeia Committee"
+    jurisdiction: india
+    doc_type: manual
+    source_url: "https://ia800501.us.archive.org/34/items/AyurvedicPharmacopoeiaOfIndiaAllVolume/Ayurvedic%20Pharmacopoeia%20of%20India%20All%20Volume.pdf"
+    format: pdf
+    version: "combined-volumes-bundle-archive.org-scan"
+    effective_date: null
+    last_verified_date: "2026-09-23"
+    notes: "cdn.ayush.gov.in and main.ayush.gov.in both fail DNS resolution from this environment (consistent with a prior audit); pcimh.gov.in returns 404 for pharmacopoeia paths. archive.org's OWN catalog item 'AyurvedicPharmacopoeiaOfIndiaAllVolume' (https://archive.org/details/AyurvedicPharmacopoeiaOfIndiaAllVolume) - not a Wayback capture of any specific ayush.gov.in URL - independently hosts this scan with 'Government of India' as the credited creator/publisher; its direct PDF is a working, non-JS, %PDF-served file. It is a multi-volume combined scan (title page reads 'THE AYURVEDIC PHARMACOPOEIA OF INDIA PART-I VOLUME-I GOVERNMENT OF INDIA'); version is labelled as a combined bundle rather than a single part/volume number because the file spans more than one and the archive.org listing does not break out per-volume page ranges. If a cleaner single-volume official PDF turns up later (e.g. a working cdn.ayush.gov.in path from a different network), prefer that and split by volume."
+
+  - doc_id: wipo-locarno-agreement-1979
+    title: "Locarno Agreement Establishing an International Classification for Industrial Designs (as amended 28 September 1979)"
+    authority: "World Intellectual Property Organization (WIPO)"
+    jurisdiction: international
+    doc_type: treaty
+    source_url: "https://www.wipo.int/edocs/pubdocs/en/wipo_pub_271.pdf"
+    format: pdf
+    version: "1979-amended"
+    effective_date: null
+    last_verified_date: "2026-09-23"
+    notes: "Official WIPO publication (pub 271) of the treaty text. Adopted Locarno, 8 Oct 1968; amended 28 Sep 1979. Entry-into-force date is not stated in this publication itself (WIPO's own treaty-status page also omits it in the fetched excerpt), so left null rather than guessed - same convention as wipo-paris-convention/wipo-budapest-treaty above. Added because the corpus already has the Designs Act 2000 and the Hague Geneva Act (international design registration) but nothing on the classification system both use to categorize design applications - directly relevant to design-registration questions for Ayurvedic product packaging/containers/branding."
+
+  - doc_id: ccras-research-policy
+    title: "CCRAS Research Policy (Revised)"
+    authority: "Central Council for Research in Ayurvedic Sciences (CCRAS), Ministry of AYUSH"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://ccras.nic.in/wp-content/uploads/2025/03/Revised-CCRAS-Research-policy-3.pdf"
+    format: pdf
+    version: "revised-2025-03"
+    effective_date: null
+    last_verified_date: "2026-09-23"
+    notes: "Directly fetched (200 OK, application/pdf) from CCRAS's own official site. Governs CCRAS-funded/conducted Ayurvedic research (IP ownership, publication, data-sharing terms for research outputs) - fills the CLAUDE.md-flagged 'ayush.gov.in/PCIM&H/CCRAS...public but fragmented' gap for research-governance questions relevant to researchers/AYUSH startups seeking CCRAS collaboration."
+
+  - doc_id: ccras-guideline-clinical-evaluation
+    title: "General Guidelines for Clinical Evaluation of Ayurvedic Interventions (Guideline Series III)"
+    authority: "Central Council for Research in Ayurvedic Sciences (CCRAS), Ministry of AYUSH"
+    jurisdiction: india
+    doc_type: guideline
+    source_url: "https://ccras.nic.in/wp-content/uploads/2024/07/CCRAS_Guideline-of-Clinical_Evaluation.pdf"
+    format: pdf
+    version: "guideline-series-III"
+    effective_date: null
+    last_verified_date: "2026-09-23"
+    notes: "Directly fetched (200 OK, application/pdf) from CCRAS's own official site (general-guideline-series page). Standards for clinical evaluation/trials of Ayurvedic interventions - relevant to practitioners/researchers/startups developing new Ayurvedic formulations who need clinical-evidence requirements ahead of regulatory filing."
+
+  - doc_id: novartis-ag-v-uoi-2013
+    title: "Novartis AG vs Union of India & Ors (Supreme Court of India, 1 April 2013)"
+    authority: "Supreme Court of India"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://indiankanoon.org/doc/165776436/"
+    format: html
+    version: "2013-6-scc-1"
+    effective_date: "2013-04-01"
+    last_verified_date: "2026-09-23"
+    notes: "Landmark Section 3(d) judgment (rejection of Novartis's beta-crystalline Imatinib Mesylate/Glivec patent for lack of enhanced therapeutic efficacy over the known substance) - the leading precedent on 3(d)'s bar against patenting mere new forms of known substances, directly relevant to patent applications covering standardized/purified extracts or new formulations of already-known Ayurvedic active compounds. Fetched and confirmed as the real judgment text (opens 'Delay condoned. Leave granted...', Justice Aftab Alam), not a search-results page."
+
+  - doc_id: tea-board-v-itc-2019
+    title: "Tea Board vs ITC Limited (Calcutta High Court, 4 February 2019)"
+    authority: "High Court at Calcutta (Original Side)"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://indiankanoon.org/doc/160420581/"
+    format: html
+    version: "2019-single-judge-final-decree"
+    effective_date: "2019-02-04"
+    last_verified_date: "2026-09-23"
+    notes: "Landmark GI-infringement/passing-off precedent under the GI Act, 1999 (scope of GI protection confined to 'goods', Section 26(4) limitation period, no infringement found against a non-competing service use of a protected GI term). Directly relevant to GI enforcement questions for any Ayurveda-linked registered GI (e.g. GI-tagged medicinal rice/herb-growing regions). This is the final single-judge decree in the suit, citing and applying the 2011 Division Bench's earlier interim-relief ruling on the same dispute - confirmed as real judgment text (opens with the Court's recitation of reliefs claimed), not a search-results page."
+
+  - doc_id: monsanto-v-nuziveedu-2019
+    title: "Monsanto Technology LLC & Ors vs Nuziveedu Seeds Ltd & Ors (Supreme Court of India, 8 January 2019)"
+    authority: "Supreme Court of India"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://indiankanoon.org/doc/116548206/"
+    format: html
+    version: "2019-sc-remand"
+    effective_date: "2019-01-08"
+    last_verified_date: "2026-09-23"
+    notes: "Patent dispute over Bt cotton (Bollgard) gene-technology licensing, touching Section 3(j)'s bar on patenting plants/seeds/biological processes and the boundary between patent rights and the PPV&FR Act's plant-variety regime - directly relevant to cultivators and to any Ayurvedic-formulation patent claim that touches a biological/plant-derived process. Confirmed as the real Supreme Court judgment text (opens 'Leave granted. The appellants/plaintiffs...'), not a search-results page."
+
+  - doc_id: patanjali-v-arudra-coronil-2021
+    title: "M/S Patanjali Ayurved Limited vs Arudra Engineers Private Limited (Madras High Court, Division Bench, 2 February 2021)"
+    authority: "High Court of Judicature at Madras"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://indiankanoon.org/doc/172085590/"
+    format: html
+    version: "2021-division-bench-appeal"
+    effective_date: "2021-02-02"
+    last_verified_date: "2026-09-23"
+    notes: "The 'Coronil' trademark dispute - Division Bench set aside a single-judge interim injunction against Patanjali Ayurved/Divya Yog Mandir Trust's use of 'CORONIL' for an Ayurvedic tablet, holding Arudra Engineers had not shown a prima facie case under Trade Marks Act s.29(4) for its unrelated industrial-chemicals mark. Directly on-topic: an Ayurvedic proprietary-medicine product-naming/trademark dispute. Confirmed as the real judgment text (opens reciting the appeal against the 06.08.2020 single-judge order), not a search-results page."
+
+  - doc_id: dabur-v-shree-baidyanath-2022
+    title: "Dabur India Limited vs Shree Baidyanath Ayurved Bhawan Pvt. Ltd. (Calcutta High Court, 8 February 2022)"
+    authority: "High Court at Calcutta"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://indiankanoon.org/doc/22130874/"
+    format: html
+    version: "2022"
+    effective_date: "2022-02-08"
+    last_verified_date: "2026-09-23"
+    notes: "Comparative-advertising/disparagement dispute between two established Ayurvedic pharmaceutical companies over Chyawanprash product claims (ingredient counts/composition). Directly on-topic for Ayurvedic product advertising-claims questions, complementing the Drugs and Magic Remedies Act and FSSAI Ayurveda Aahara Regulations already in the corpus. Confirmed as the real judgment text describing the five impugned October-November 2021 advertisements, not a search-results page."
+
+  - doc_id: dabur-v-nba-abs-2023
+    title: "Dabur India Limited vs National Biodiversity Authority (National Green Tribunal, Southern Zone, 20 December 2023)"
+    authority: "National Green Tribunal, Southern Zone, Chennai"
+    jurisdiction: india
+    doc_type: case_law
+    source_url: "https://indiankanoon.org/doc/43196436/"
+    format: html
+    version: "2023-ngt"
+    effective_date: "2023-12-20"
+    last_verified_date: "2026-09-23"
+    notes: "Directly on-point ABS enforcement case: dispute over whether benefit-sharing fees for 133 biological resources accessed for Ayurvedic medicine manufacturing are calculated on resource purchase price (BD Rules Regulation 3) or product sale price (Regulation 4) under the Biological Diversity Act, 2002. Squarely supports FR-08 (ABS assistant) benefit-sharing-calculation questions and complements Divya Pharmacy v UoI as a second, more recent ABS precedent. Confirmed as the real NGT order text (opens explaining the doctrine of Access and Benefit Sharing), not a search-results page."
