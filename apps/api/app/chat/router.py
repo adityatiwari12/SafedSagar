@@ -401,6 +401,7 @@ async def _process_chat_turn(
             )
             response = ChatTurnResponse(
                 conversationId=str(conversation.id),
+                used_conversation_context=bool(history_text),
                 classification=ClassificationOut(product_type="out_of_scope", ip_type="out_of_scope"),
                 jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
                 answer=localized_refusal[0],
@@ -443,6 +444,7 @@ async def _process_chat_turn(
             )
             response = ChatTurnResponse(
                 conversationId=str(conversation.id),
+                used_conversation_context=bool(history_text),
                 clarifying_questions=localized_questions,
                 classification=ClassificationOut(product_type="unknown", ip_type="unknown"),
                 jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
@@ -488,6 +490,7 @@ async def _process_chat_turn(
         )
         response = ChatTurnResponse(
             conversationId=str(conversation.id),
+            used_conversation_context=bool(history_text),
             clarifying_questions=localized_questions,
             classification=ClassificationOut(
                 product_type=state.get("product_classification", "unclear"),
@@ -535,6 +538,7 @@ async def _process_chat_turn(
     )
     response = ChatTurnResponse(
         conversationId=str(conversation.id),
+        used_conversation_context=bool(history_text),
         classification=ClassificationOut(
             product_type=state.get("product_classification", "unclear"),
             ip_type=", ".join(ip_types) if ip_types else "unknown",

@@ -91,6 +91,11 @@ class ChatTurnResponse(BaseModel):
     # Knowledge-graph neighbours of this answer (app/kg/expand.py) -
     # additive; empty on turns that don't reach expand_with_graph.
     related_provisions: list[RelatedProvisionOut] = []
+    # True when this turn folded prior turns of the conversation into the
+    # graph's question (chat/router.py's history_text) - i.e. a follow-up
+    # like "what about internationally?" was actually resolved using what
+    # was asked/answered earlier, not read in isolation.
+    used_conversation_context: bool = False
 
 
 class EscalateRequest(BaseModel):
