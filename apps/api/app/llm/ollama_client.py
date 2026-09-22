@@ -65,6 +65,7 @@ def generate_json(
         "messages": [{"role": "user", "content": prompt}],
         "format": "json",
         "stream": False,
+        "options": {"num_ctx": settings.ollama_num_ctx},
     }
     if think is not None:
         body["think"] = think

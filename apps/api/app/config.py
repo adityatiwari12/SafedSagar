@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_embed_model: str = "nomic-embed-text"
     ollama_generate_model: str = "llama3.2"
+    # Context window for generation calls. Ollama's own default is 2048
+    # tokens, and it silently truncates anything longer from the front -
+    # which is where the reason_and_cite prompt keeps its rules (cite only
+    # numbered chunks, return JSON, answer the actual question). Real
+    # answer prompts run ~4.5-5.2k tokens, so at the default every answer
+    # was generated from less than half its prompt. 8192 fits them with
+    # headroom for the response; llama3.2 supports far more, but on CPU
+    # the KV cache (~110KB/token for a 3B model) makes much larger costly.
+    ollama_num_ctx: int = 8192
     # Optional override used only by reason_and_cite (the final-answer call,
     # where quality matters more than latency) - e.g. "gpt-oss:20b" for a
     # thinking-model quality bump. classify_product/routers stay on the fast
