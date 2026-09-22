@@ -199,6 +199,59 @@ class ComplianceStatus(str, enum.Enum):
     not_applicable = "not_applicable"
 
 
+class ResourceOrigin(str, enum.Enum):
+    """Where a Product's biological resource was sourced from (Phase 9
+    ABS assessment). `unknown` is a distinct, explicit "not yet
+    determined" answer, not the same as the column being NULL (not yet
+    answered at all) - app.abs.rules treats both as "still needs
+    input"."""
+
+    india = "india"
+    outside_india = "outside_india"
+    unknown = "unknown"
+
+
+class ResourceSourcing(str, enum.Enum):
+    """How the biological resource is obtained."""
+
+    wild_collected = "wild_collected"
+    cultivated = "cultivated"
+    both = "both"
+    unknown = "unknown"
+
+
+class ResourcePurpose(str, enum.Enum):
+    """Why the biological resource is being used - drives which NBA
+    approval track is likely relevant (commercial raises the stakes over
+    research-only, structurally, per app.abs.rules)."""
+
+    commercial = "commercial"
+    research_only = "research_only"
+    unknown = "unknown"
+
+
+class EntityCategory(str, enum.Enum):
+    """Who is accessing/using the biological resource - the Biological
+    Diversity Act draws a structural distinction here (foreign entity vs
+    Indian individual/company) that changes which NBA approval track
+    applies."""
+
+    indian_individual = "indian_individual"
+    indian_company = "indian_company"
+    foreign_entity = "foreign_entity"
+    unknown = "unknown"
+
+
+class AbsAssessmentStatus(str, enum.Enum):
+    """An ABS assessment wizard's own completion status - distinct from
+    ComplianceStatus, which tracks a checklist item's remediation state,
+    not a questionnaire's fill-in progress."""
+
+    not_started = "not_started"
+    in_progress = "in_progress"
+    complete = "complete"
+
+
 class User(Base):
     """A platform user (end user, facilitator, or admin)."""
 
@@ -763,6 +816,78 @@ class ComplianceItem(Base):
     updated_by_user: Mapped["User | None"] = relationship()
 
 
+class AbsAssessment(Base):
+    """A Product's Access and Benefit-Sharing questionnaire (Phase 9) -
+    one row per product, redone in place (upserted) rather than
+    duplicated, matching how compliance-checklist regeneration works.
+    `preliminary_framework`/`next_steps` are system-derived by
+    app.abs.rules.derive_preliminary_framework from the answerable
+    fields below - structural language only, never a hardcoded statute
+    citation (CLAUDE.md: "Do not invent real legal citations"). This is
+    a compliance aid, not a legal determination: it never asserts the
+    product *is* compliant, only which framework/process likely applies.
+    `applicable_provisions` is only ever populated by
+    app.abs.service.attach_evidence running the real retrieve/rerank
+    pipeline over `source_documents`, same evidence shape and same
+    never-hand-written rule as ComplianceItem.evidence.
+    """
+
+    __tablename__ = "abs_assessments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id"), nullable=False, unique=True, index=True
+    )
+
+    # null = not yet answered at all (distinct from a False/"unknown"
+    # answer already given).
+    is_biological_resource: Mapped[bool | None] = mapped_column(nullable=True)
+    resource_description: Mapped[str | None] = mapped_column(String, nullable=True)
+    origin: Mapped[ResourceOrigin | None] = mapped_column(
+        SAEnum(ResourceOrigin, name="abs_resource_origin"), nullable=True
+    )
+    sourcing: Mapped[ResourceSourcing | None] = mapped_column(
+        SAEnum(ResourceSourcing, name="abs_resource_sourcing"), nullable=True
+    )
+    involves_traditional_knowledge: Mapped[bool | None] = mapped_column(nullable=True)
+    purpose: Mapped[ResourcePurpose | None] = mapped_column(
+        SAEnum(ResourcePurpose, name="abs_resource_purpose"), nullable=True
+    )
+    user_entity_category: Mapped[EntityCategory | None] = mapped_column(
+        SAEnum(EntityCategory, name="abs_entity_category"), nullable=True
+    )
+
+    # System-derived by app.abs.rules.derive_preliminary_framework -
+    # structural language describing which framework likely applies and
+    # what's still needed, never a hardcoded legal citation.
+    preliminary_framework: Mapped[str | None] = mapped_column(String, nullable=True)
+    # list[{"doc_id": str, "section_or_article": str | None, "title": str,
+    # "authority": str, "source_url": str}] - same evidence shape and
+    # never-hand-written rule as ComplianceItem.evidence.
+    applicable_provisions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # list[str] - structural next steps, not legal text.
+    next_steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
+    status: Mapped[AbsAssessmentStatus] = mapped_column(
+        SAEnum(AbsAssessmentStatus, name="abs_assessment_status"),
+        nullable=False,
+        server_default=AbsAssessmentStatus.not_started.value,
+    )
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    product: Mapped["Product"] = relationship()
+    updated_by_user: Mapped["User | None"] = relationship()
+
+
 # ---------------------------------------------------------------------------
 # Legal knowledge graph (app/kg). Built from source_documents by
 # `python -m app.kg.build` - see app/kg/build.py for the no-fabrication
@@ -844,3 +969,72 @@ class KgEdge(Base):
     origin: Mapped[KgEdgeOrigin] = mapped_column(SAEnum(KgEdgeOrigin, name="kg_edge_origin"), nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=False)
     note: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Secure document storage (Phase 28) - the foundation for the label/
+# advertisement analyser (Phase 11) and the researcher workspace. Bytes
+# live on disk via app.documents.storage.StorageBackend; this table is the
+# metadata/ownership record. Access follows app.authz.service.
+# can_access_resource (owner_user_id OR organization_id membership OR an
+# accessible product/case - checked in app.documents.router, not here).
+# ---------------------------------------------------------------------------
+
+
+class DocumentKind(str, enum.Enum):
+    """What kind of document was uploaded - display/classification only,
+    doesn't affect access control."""
+
+    label = "label"
+    certificate = "certificate"
+    formulation_sheet = "formulation_sheet"
+    correspondence = "correspondence"
+    other = "other"
+
+
+class DocumentStatus(str, enum.Enum):
+    """Soft-delete status. A document may be referenced by a case's
+    history, so DELETE never drops the row - it deletes the underlying
+    bytes via the storage backend and flips this to `deleted`."""
+
+    active = "active"
+    deleted = "deleted"
+
+
+class Document(Base):
+    """An uploaded file's metadata/ownership record (Phase 28). The
+    `storage_key` is an opaque uuid4-derived key, never derived from the
+    client-supplied filename - see app.documents.storage. `filename` is
+    kept only as display metadata."""
+
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
+    product_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
+    case_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("cases.id"), nullable=True, index=True)
+
+    filename: Mapped[str] = mapped_column(String, nullable=False)
+    content_type: Mapped[str] = mapped_column(String, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(nullable=False)
+    storage_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    doc_kind: Mapped[DocumentKind] = mapped_column(SAEnum(DocumentKind, name="document_kind"), nullable=False)
+    status: Mapped[DocumentStatus] = mapped_column(
+        SAEnum(DocumentStatus, name="document_status"),
+        nullable=False,
+        server_default=DocumentStatus.active.value,
+    )
+    uploaded_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    owner: Mapped["User"] = relationship(foreign_keys=[owner_user_id])
+    uploaded_by: Mapped["User"] = relationship(foreign_keys=[uploaded_by_user_id])
+    organization: Mapped["Organization | None"] = relationship()
+    product: Mapped["Product | None"] = relationship()
+    case: Mapped["Case | None"] = relationship()

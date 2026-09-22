@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     # wheel on Windows. See app/translation/indictrans2_provider.py.
     indictrans2_sidecar_url: str = "http://localhost:8600"
 
+    # Secure document storage (Phase 28) - app.documents.storage.
+    # LocalFilesystemStorage root. No cloud storage credentials exist in
+    # this project yet, so uploads land on local disk behind a small
+    # StorageBackend interface; swapping in real object storage later is a
+    # one-class change, not a rewrite.
+    document_storage_root: str = "./data/documents"
+    document_max_upload_bytes: int = 20 * 1024 * 1024
+
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).parent.parent / ".env"),
         env_file_encoding="utf-8",

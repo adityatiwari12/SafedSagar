@@ -15,7 +15,7 @@ from app.authz.constants import Permission
 from app.authz.service import AuthzContext, can_access_resource, require_permission
 from app.cases.router import _to_case_out
 from app.cases.schemas import CaseOut
-from app.db.models import AuditLogEntry, Case, ComplianceItem, Product
+from app.db.models import AbsAssessment, AuditLogEntry, Case, ComplianceItem, Document, Product
 from app.graph.state import PRODUCT_CATEGORIES
 from app.products.schemas import ProductCreate, ProductOut, ProductUpdate
 
@@ -205,6 +205,17 @@ async def delete_product(
     # cascade-delete rather than detach. Explicit DELETE, not a DB-level
     # ON DELETE CASCADE, matching this codebase's explicit-in-code style.
     await db.execute(delete(ComplianceItem).where(ComplianceItem.product_id == product_id))
+
+    # Same reasoning as ComplianceItem above: an ABS assessment has no
+    # meaning without its product, and abs_assessments.product_id is
+    # NOT NULL (unlike cases.product_id) so without this the delete
+    # raises a ForeignKeyViolationError (500) for any product that has
+    # ever had an ABS assessment saved.
+    await db.execute(delete(AbsAssessment).where(AbsAssessment.product_id == product_id))
+
+    # Same detach-don't-cascade reasoning as Case above: a Document can
+    # outlive the specific product it was originally attached to.
+    await db.execute(update(Document).where(Document.product_id == product_id).values(product_id=None))
 
     db.add(
         AuditLogEntry(

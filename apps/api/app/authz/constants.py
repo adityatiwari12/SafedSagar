@@ -127,6 +127,10 @@ class Permission:
     ANALYTICS_ORGANIZATION = "analytics.organization"
     ANALYTICS_NATIONAL = "analytics.national"
 
+    DOCUMENT_CREATE = "document.create"
+    DOCUMENT_VIEW = "document.view"
+    DOCUMENT_DELETE = "document.delete"
+
 
 # (key, resource, action, description) - what gets seeded into `permissions`.
 PERMISSION_CATALOG: list[tuple[str, str, str, str]] = [
@@ -178,6 +182,9 @@ PERMISSION_CATALOG: list[tuple[str, str, str, str]] = [
     (Permission.ANALYTICS_PERSONAL, "analytics", "personal", "View one's own usage analytics."),
     (Permission.ANALYTICS_ORGANIZATION, "analytics", "organization", "View aggregate analytics for one's organization."),
     (Permission.ANALYTICS_NATIONAL, "analytics", "national", "View platform-wide aggregate analytics."),
+    (Permission.DOCUMENT_CREATE, "document", "create", "Upload a document."),
+    (Permission.DOCUMENT_VIEW, "document", "view", "View/list/download a document's metadata or bytes."),
+    (Permission.DOCUMENT_DELETE, "document", "delete", "Soft-delete a document and its stored bytes."),
 ]
 
 # ---------------------------------------------------------------------------
@@ -216,6 +223,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         # already a member of - never a blanket admin-like grant.
         Permission.ORG_MANAGE_MEMBERS,
         Permission.ANALYTICS_PERSONAL,
+        Permission.DOCUMENT_CREATE,
+        Permission.DOCUMENT_VIEW,
+        Permission.DOCUMENT_DELETE,
     },
     RoleName.FACILITATOR: _AI_PERMISSIONS
     | {

@@ -23,6 +23,10 @@ vite.config.d.ts
 /corpus/raw/*
 !/corpus/raw/.gitkeep
 
+# Uploaded document storage (app.documents.storage.LocalFilesystemStorage,
+# document_storage_root in apps/api/app/config.py)
+/apps/api/data/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -3,11 +3,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.abs.router import router as abs_router
 from app.admin.router import router as admin_router
 from app.auth.router import router as auth_router
 from app.cases.router import router as cases_router
 from app.chat.router import router as chat_router
 from app.compliance.router import router as compliance_router
+from app.documents.router import router as documents_router
 from app.products.router import router as products_router
 from app.query.router import router as query_router
 from app.translation.router import router as translation_router
@@ -36,6 +38,8 @@ app.include_router(chat_router)
 app.include_router(cases_router)
 app.include_router(products_router)
 app.include_router(compliance_router)
+app.include_router(abs_router)
+app.include_router(documents_router)
 app.include_router(admin_router)
 app.include_router(translation_router)
 
