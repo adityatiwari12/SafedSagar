@@ -1,9 +1,10 @@
 """The /chat and /escalations endpoints - the contract apps/web's
 realChatApi.ts already expects. Wraps the same graph app/query/router.py
-uses, adding: conversation continuity (a conversationId thread), a single
-round of clarifying questions when classify_product can't tell what the
-product is, and citation enrichment (title/source_url) from the chunks
-the graph actually retrieved.
+uses, adding: conversation continuity (a conversationId thread), a real
+multi-round conversational intake (up to _INTAKE_ROUND_CAP targeted
+follow-up questions, asked one at a time, until assess_intake judges it
+actually understands the product and the ask), and citation enrichment
+(title/source_url) from the chunks the graph actually retrieved.
 """
 
 import uuid
@@ -42,7 +43,7 @@ from app.db.models import (
     Product,
     User,
 )
-from app.graph.graph import NodeDoneCallback, run_classification, run_graph, run_remaining
+from app.graph.graph import NodeDoneCallback, run_classification, run_remaining
 from app.graph.state import GraphState
 from app.llm.generate import get_last_call_metadata
 from app.translation.languages import DEFAULT_LANGUAGE, is_supported
@@ -59,6 +60,7 @@ router = APIRouter(tags=["chat"])
 NODE_TO_STEP = {
     "language": "language",
     "condense_query": "understand",
+    "assess_intake": "understand",
     "classify_product": "classify",
     "route_jurisdiction": "jurisdiction",
     "route_ip_type": "need",
@@ -72,17 +74,6 @@ NODE_TO_STEP = {
 }
 
 _VALID_JURISDICTIONS = {"india", "international"}
-
-# Asked once, only on a fresh (non-clarification-answer) turn, when
-# classify_product can't determine the product category from the text
-# alone. Static wording (the fixed set a user answers once) rather than
-# LLM-generated questions - classify_product's job is deciding WHETHER
-# to ask, not composing bespoke question text.
-CLARIFYING_QUESTIONS = [
-    "Is this a classical Ayurvedic formulation, a proprietary Ayurvedic medicine, or a new composition?",
-    "Is the intended use primarily as a drug/medicine, food (Ayurveda Aahara), or cosmetic?",
-    "What do you mainly need help with - patent, trademark, GI, ABS/biodiversity, or regulatory compliance?",
-]
 
 _OUT_OF_SCOPE_MESSAGE = (
     "This assistant only covers Ayurveda intellectual-property, biodiversity/ABS, and "
@@ -160,6 +151,46 @@ async def _build_history_text(
     return "\n".join(lines)
 
 
+# How many clarifying rounds one exchange may spend before the assistant
+# must answer with whatever it has. The product decision is "keep asking
+# until you actually understand, like a real conversation" - but an
+# uncapped loop is a user-visible dead end when the model simply can't be
+# satisfied, so 5 is the hard stop.
+_INTAKE_ROUND_CAP = 5
+
+# Prepended to next_steps when the cap (not the model's own judgment)
+# is what ended the intake, so a best-effort answer is visibly labelled
+# as one rather than silently passed off as a confident reply.
+_BEST_EFFORT_NEXT_STEP = (
+    "This answer uses the best available understanding of your question after several "
+    "clarifying rounds - for more precise guidance, consider rephrasing with more detail "
+    "about your product and specific goal."
+)
+
+
+async def _count_recent_clarifying_rounds(db: AsyncSession, conversation: Conversation) -> int:
+    """How many consecutive most-recent assistant turns in this
+    conversation were clarifying-question rounds (not yet followed by a
+    real answer) - resets to 0 the moment a real answer has been given,
+    so a fresh ambiguous follow-up later in a long conversation gets its
+    own full round budget, not whatever was left over from an earlier
+    exchange."""
+    result = await db.execute(
+        select(Message)
+        .where(Message.conversation_id == conversation.id, Message.role == MessageRole.assistant)
+        .order_by(Message.created_at.desc())
+        .limit(_INTAKE_ROUND_CAP + 1)
+    )
+    count = 0
+    for message in result.scalars().all():
+        response_json = message.response_json or {}
+        if response_json.get("clarifying_questions"):
+            count += 1
+        else:
+            break
+    return count
+
+
 def _enrich_citations(state: GraphState) -> list[CitationOut]:
     chunks_by_key = {
         (c["doc_id"], c["section_or_article"]): c for c in state.get("reranked_chunks", [])
@@ -183,8 +214,9 @@ def _localize_list(
     translation_service, texts: list[str], target_language: str
 ) -> tuple[list[str], str, bool]:
     """Translate each string independently, returning ("failed" overall
-    status if any one did) - used for the static CLARIFYING_QUESTIONS list,
-    which has no single canonical answer to fall back to as a whole."""
+    status if any one did) - used for clarifying-question and refusal
+    text, which has no single canonical answer to fall back to as a
+    whole."""
     if target_language == DEFAULT_LANGUAGE:
         return texts, "not_needed", False
 
@@ -360,6 +392,11 @@ async def _process_chat_turn(
     # otherwise flush that pending insert first and the "prior messages"
     # query would see (and duplicate) the current turn.
     history_text = await _build_history_text(db, conversation)
+    # Computed once per request, before this turn's rows are added, and
+    # reused by BOTH ask-points below (the assess_intake gate and
+    # reason_and_cite's dynamic question) - they share one round budget,
+    # so counting twice would let a turn ask past the cap.
+    round_count = await _count_recent_clarifying_rounds(db, conversation)
 
     # Stored content is always the canonical English text - history-folding
     # and the graph itself stay English-only regardless of the user's
@@ -376,115 +413,123 @@ async def _process_chat_turn(
         )
     )
 
-    # Only offer clarification on a fresh attempt - once the user has
-    # answered (frontend sends `answers` on that round), never ask again,
-    # even if still unclear: one round max (CLAUDE.md - no unnecessary
-    # questions).
-    is_clarification_answer = bool(payload.answers)
-
-    if not is_clarification_answer:
-        # Classify first, cheaply - condense_query + classify_product only,
-        # no retrieval or reasoning yet. Previously this ran the FULL graph
-        # (including the slow reason_and_cite LLM call) just to check
-        # product_classification, discarding a real answer whenever it came
-        # back "unclear".
-        classify_state = await run_classification(
-            canonical_text, jurisdiction, None, history_text=history_text, on_node_done=on_node_done
+    # Classify first, cheaply - condense_query + classify_product +
+    # assess_intake only, no retrieval or reasoning yet. Previously this ran
+    # the FULL graph (including the slow reason_and_cite LLM call) just to
+    # check product_classification, discarding a real answer whenever it
+    # came back "unclear".
+    classify_state = await run_classification(
+        canonical_text, jurisdiction, None, history_text=history_text, on_node_done=on_node_done
+    )
+    if classify_state.get("product_classification") == "out_of_scope":
+        # Not "unclear" (ambiguous but on-topic) - the question isn't
+        # about Ayurveda IP/biodiversity/regulatory matters at all.
+        # Refuse immediately rather than asking clarifying questions or
+        # running jurisdiction/retrieval/reasoning on it.
+        localized_refusal, refusal_status, refusal_review = _localize_list(
+            translation_service, [_OUT_OF_SCOPE_MESSAGE], target_language
         )
-        if classify_state.get("product_classification") == "out_of_scope":
-            # Not "unclear" (ambiguous but on-topic) - the question isn't
-            # about Ayurveda IP/biodiversity/regulatory matters at all.
-            # Refuse immediately rather than asking clarifying questions or
-            # running jurisdiction/retrieval/reasoning on it.
-            localized_refusal, refusal_status, refusal_review = _localize_list(
-                translation_service, [_OUT_OF_SCOPE_MESSAGE], target_language
-            )
-            response = ChatTurnResponse(
-                conversationId=str(conversation.id),
-                used_conversation_context=bool(history_text),
-                classification=ClassificationOut(product_type="out_of_scope", ip_type="out_of_scope"),
-                jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
-                answer=localized_refusal[0],
-                citations=[],
-                confidence=0.0,
-                confidence_band="low",
-                escalate_recommended=False,
-                detected_language=incoming.detected_language,
-                canonical_query=canonical_text,
-                canonical_answer=_OUT_OF_SCOPE_MESSAGE,
-                translation_status=refusal_status,
-                needs_human_review=refusal_review,
-                timing_ms=classify_state.get("node_timings"),
-            )
-            db.add(
-                Message(
-                    conversation_id=conversation.id,
-                    role=MessageRole.assistant,
-                    content=_OUT_OF_SCOPE_MESSAGE,
-                    display_text=localized_refusal[0],
-                    response_json=response.model_dump(),
-                    language=target_language,
-                )
-            )
-            await _create_case(
-                db,
-                current_user=current_user,
-                conversation=conversation,
-                question=canonical_text,
-                target_language=target_language,
-                state=classify_state,
-                response=response,
-                product_id=product.id if product else None,
-            )
-            await db.commit()
-            return response
-        if classify_state.get("product_classification") == "unclear":
-            localized_questions, cq_status, cq_review = _localize_list(
-                translation_service, CLARIFYING_QUESTIONS, target_language
-            )
-            response = ChatTurnResponse(
-                conversationId=str(conversation.id),
-                used_conversation_context=bool(history_text),
-                clarifying_questions=localized_questions,
-                classification=ClassificationOut(product_type="unknown", ip_type="unknown"),
-                jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
-                answer="",
-                citations=[],
-                confidence=classify_state.get("confidence_score", 0.0),
-                confidence_band="low",
-                escalate_recommended=False,
-                detected_language=incoming.detected_language,
-                canonical_query=canonical_text,
-                canonical_answer=None,
-                translation_status=cq_status,
-                needs_human_review=cq_review,
-                timing_ms=classify_state.get("node_timings"),
-            )
-            db.add(
-                Message(
-                    conversation_id=conversation.id,
-                    role=MessageRole.assistant,
-                    content="\n".join(CLARIFYING_QUESTIONS),
-                    display_text="\n".join(localized_questions),
-                    response_json=response.model_dump(),
-                    language=target_language,
-                )
-            )
-            await db.commit()
-            return response
-        state = await run_remaining(classify_state, on_node_done=on_node_done)
-    else:
-        state = await run_graph(
-            canonical_text, jurisdiction, None, history_text=history_text, on_node_done=on_node_done
+        response = ChatTurnResponse(
+            conversationId=str(conversation.id),
+            used_conversation_context=bool(history_text),
+            classification=ClassificationOut(product_type="out_of_scope", ip_type="out_of_scope"),
+            jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
+            answer=localized_refusal[0],
+            citations=[],
+            confidence=0.0,
+            confidence_band="low",
+            escalate_recommended=False,
+            detected_language=incoming.detected_language,
+            canonical_query=canonical_text,
+            canonical_answer=_OUT_OF_SCOPE_MESSAGE,
+            translation_status=refusal_status,
+            needs_human_review=refusal_review,
+            timing_ms=classify_state.get("node_timings"),
         )
+        db.add(
+            Message(
+                conversation_id=conversation.id,
+                role=MessageRole.assistant,
+                content=_OUT_OF_SCOPE_MESSAGE,
+                display_text=localized_refusal[0],
+                response_json=response.model_dump(),
+                language=target_language,
+            )
+        )
+        await _create_case(
+            db,
+            current_user=current_user,
+            conversation=conversation,
+            question=canonical_text,
+            target_language=target_language,
+            state=classify_state,
+            response=response,
+            product_id=product.id if product else None,
+        )
+        await db.commit()
+        return response
 
-    # Second (and last - one round max, same as the product-classification
-    # gate above) chance to ask instead of guess: reason_and_cite flags this
-    # when the question is real but too under-specified to answer precisely
-    # (e.g. "Indian medicinal plants" naming no plant), rather than always
-    # forcing out a generic best-effort answer.
-    dynamic_clarifying_question = state.get("clarifying_question") if not is_clarification_answer else None
-    if dynamic_clarifying_question:
+    # Multi-round conversational intake. assess_intake decides per turn
+    # whether it yet knows what the product is AND what the user actually
+    # wants to know; a mid-intake reply is just another fresh turn (it
+    # arrives with the prior questions in history_text), so there is no
+    # "answering a fixed question list" special case any more. round_count
+    # is the one shared budget for BOTH ask-points in this function - this
+    # early gate and reason_and_cite's later dynamic question.
+    intake_sufficient = classify_state.get("intake_sufficient", True) or round_count >= _INTAKE_ROUND_CAP
+    if not intake_sufficient:
+        intake_question = classify_state.get("intake_question") or (
+            "Could you share a bit more about the product and what you'd like to know?"
+        )
+        localized_questions, cq_status, cq_review = _localize_list(
+            translation_service, [intake_question], target_language
+        )
+        response = ChatTurnResponse(
+            conversationId=str(conversation.id),
+            used_conversation_context=bool(history_text),
+            clarifying_questions=localized_questions,
+            classification=ClassificationOut(
+                product_type=classify_state.get("product_classification", "unclear"),
+                ip_type="unknown",
+            ),
+            jurisdiction=classify_state.get("jurisdiction") or payload.jurisdiction,
+            answer="",
+            citations=[],
+            confidence=classify_state.get("confidence_score", 0.0),
+            confidence_band="low",
+            escalate_recommended=False,
+            detected_language=incoming.detected_language,
+            canonical_query=canonical_text,
+            canonical_answer=None,
+            translation_status=cq_status,
+            needs_human_review=cq_review,
+            timing_ms=classify_state.get("node_timings"),
+        )
+        db.add(
+            Message(
+                conversation_id=conversation.id,
+                role=MessageRole.assistant,
+                content=intake_question,
+                display_text=localized_questions[0],
+                response_json=response.model_dump(),
+                language=target_language,
+            )
+        )
+        await db.commit()
+        return response
+
+    state = await run_remaining(classify_state, on_node_done=on_node_done)
+
+    # Second chance to ask instead of guess: reason_and_cite flags this when
+    # the question is real but too under-specified to answer precisely (e.g.
+    # "Indian medicinal plants" naming no plant), rather than always forcing
+    # out a generic best-effort answer. Shares the SAME round budget as the
+    # intake gate above - once the cap is spent, fall through to the real
+    # answer path instead (reason_and_cite always fills `answer` with its
+    # best general answer even when it also sets clarifying_question, per
+    # its own prompt: "it's shown only if the graph decides to ask").
+    dynamic_clarifying_question = state.get("clarifying_question")
+    if dynamic_clarifying_question and round_count < _INTAKE_ROUND_CAP:
         localized_questions, cq_status, cq_review = _localize_list(
             translation_service, [dynamic_clarifying_question], target_language
         )
@@ -525,6 +570,14 @@ async def _process_chat_turn(
     canonical_answer = state.get("answer", "")
     outgoing = translation_service.resolve_outgoing(canonical_answer, target_language)
 
+    # Reaching here with the budget spent means the cap - not the
+    # assistant's own judgment - ended the intake, so this is a best-effort
+    # answer. Say so deterministically rather than hoping the LLM mentions
+    # it: the owner asked for this to be visible, not silent.
+    next_steps = list(state.get("next_steps") or [])
+    if round_count >= _INTAKE_ROUND_CAP:
+        next_steps.insert(0, _BEST_EFFORT_NEXT_STEP)
+
     ip_types = state.get("ip_types", [])
     call_metadata = get_last_call_metadata()
     answered_by = (
@@ -549,7 +602,7 @@ async def _process_chat_turn(
         confidence=state.get("confidence_score", 0.0),
         confidence_band=state.get("confidence_level", "low"),
         escalate_recommended=state.get("escalate", False),
-        next_steps=state.get("next_steps") or None,
+        next_steps=next_steps or None,
         abs_tk_flags=_abs_tk_flags(state),
         detected_language=incoming.detected_language,
         canonical_query=canonical_text,

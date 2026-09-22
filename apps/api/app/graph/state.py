@@ -31,6 +31,12 @@ class GraphState(TypedDict, total=False):
     doc_type: str | None
 
     product_classification: str  # one of PRODUCT_CATEGORIES, or "unclear"
+    # Set by assess_intake: whether the conversation so far carries enough
+    # information (what the product is + what the user actually wants to
+    # know) to run the full pipeline, or whether one more targeted
+    # follow-up should be asked first. chat/router.py owns the round cap.
+    intake_sufficient: bool
+    intake_question: str | None  # the one follow-up to ask when not sufficient
     jurisdiction_source: str  # "explicit" (caller provided it) | "inferred"
     ip_types: list[str]  # subset of IP_TYPES
 
@@ -50,8 +56,9 @@ class GraphState(TypedDict, total=False):
     # Set by reason_and_cite when the question is too under-specified to
     # answer precisely (e.g. "medicinal plants" with no plant/source/scale
     # named) - one targeted question to ask instead of a generic answer.
-    # None once the user has already answered a clarifying round this turn
-    # (chat/router.py won't ask twice).
+    # Shares chat/router.py's _INTAKE_ROUND_CAP budget with assess_intake:
+    # once that budget is spent the router ignores this and answers with
+    # reason_and_cite's best-effort answer instead.
     clarifying_question: str | None
 
     confidence_score: float  # 0.0-1.0

@@ -4,10 +4,10 @@ why this isn't built on the `langgraph` package. Node sequence matches
 CLAUDE.md's architecture section, plus a condense_query step ahead of it
 (the query-planner gap CLAUDE.md's "Known gaps" section flags as FR-10):
 
-    condense_query -> classify_product -> route_jurisdiction ->
-    route_ip_type -> retrieve -> rerank -> expand_with_graph ->
-    reason_and_cite -> validate_citations -> score_confidence ->
-    escalate_if_needed
+    condense_query -> classify_product -> assess_intake ->
+    route_jurisdiction -> route_ip_type -> retrieve -> rerank ->
+    expand_with_graph -> reason_and_cite -> validate_citations ->
+    score_confidence -> escalate_if_needed
 
 expand_with_graph (app/kg) appends provisions the legal knowledge graph
 connects to the reranked set - real source_documents rows, so
@@ -17,6 +17,8 @@ Split into CLASSIFY_NODES / REMAINING_NODES so a caller (chat/router.py's
 clarifying-question precheck) can run just enough to decide whether to
 ask a clarifying question, without paying for retrieval + the slow
 reason_and_cite LLM call on a turn whose answer will be thrown away.
+assess_intake rides along in that cheap pass, so the multi-round intake
+decision comes for free in the same pre-retrieval call.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import inspect
 import time
 from typing import Awaitable, Callable
 
+from app.graph.nodes.assess_intake import assess_intake
 from app.graph.nodes.classify_product import classify_product
 from app.graph.nodes.condense_query import condense_query
 from app.graph.nodes.escalate_if_needed import escalate_if_needed
@@ -43,6 +46,7 @@ Node = Callable[[GraphState], dict] | Callable[[GraphState], Awaitable[dict]]
 CLASSIFY_NODES: list[Node] = [
     condense_query,
     classify_product,
+    assess_intake,
 ]
 
 REMAINING_NODES: list[Node] = [
@@ -115,8 +119,8 @@ async def run_classification(
     history_text: str | None = None,
     on_node_done: NodeDoneCallback | None = None,
 ) -> GraphState:
-    """Run only condense_query + classify_product - enough to decide
-    whether to ask a clarifying question, without running retrieval or
+    """Run only condense_query + classify_product + assess_intake - enough
+    to decide whether to ask a clarifying question, without running retrieval or
     the LLM reasoning call. Pass the result to run_remaining to continue
     the same turn without recomputing these nodes."""
     state = _initial_state(question, jurisdiction, doc_type, history_text)

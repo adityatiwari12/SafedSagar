@@ -10,6 +10,11 @@ class ChatTurnRequest(BaseModel):
     conversationId: str | None = None
     text: str
     jurisdiction: str = "india"  # "india" | "international"
+    # Legacy: the old fixed-question clarifying round posted the user's
+    # answers back here. Intake is now multi-round free conversation - a
+    # reply to a clarifying question is just the next turn's `text` - so
+    # this is ignored. Kept so a stale frontend build sending it still
+    # validates instead of 422ing.
     answers: dict[str, str] | None = None
     language: str | None = None
     # Optional Product dossier this turn is about (app/products/router.py).
