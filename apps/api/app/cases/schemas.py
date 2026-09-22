@@ -42,3 +42,19 @@ class ReviewActionOut(BaseModel):
     action: str
     notes: str | None
     created_at: datetime
+
+
+class CaseMessageOut(BaseModel):
+    id: uuid.UUID
+    case_id: uuid.UUID
+    author_user_id: uuid.UUID
+    author_email: str
+    author_role: str
+    body: str
+    kind: str
+    created_at: datetime
+
+
+class CaseMessageCreate(BaseModel):
+    body: str
+    kind: str = "note"  # one of app.db.models.CaseMessageKind's values

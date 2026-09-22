@@ -153,6 +153,21 @@ class ExpertReviewAction(str, enum.Enum):
     escalate = "escalate"
 
 
+class CaseMessageKind(str, enum.Enum):
+    """One message in a Case's back-and-forth thread (Phase 23's expert-
+    escalation loop: ... expert assigned -> review -> additional
+    information if required -> expert response -> user notification ->
+    closure). Distinguishes a plain note from a reviewer's request for
+    more information, the user's reply to that request, and the
+    reviewer's substantive final answer - `expert_response` does NOT
+    auto-close the case, closing stays close_case's separate action."""
+
+    note = "note"
+    info_request = "info_request"
+    info_response = "info_response"
+    expert_response = "expert_response"
+
+
 class ComplianceArea(str, enum.Enum):
     """A checklist area for a product's regulatory-compliance dossier
     (Phase 10). Structural buckets only - which areas apply to a product
@@ -629,6 +644,33 @@ class ExpertReview(Base):
 
     case: Mapped["Case"] = relationship()
     reviewer: Mapped["User"] = relationship()
+
+
+class CaseMessage(Base):
+    """One message in a Case's message thread, between the case's own
+    user and its assigned reviewer (see CaseMessageKind)."""
+
+    __tablename__ = "case_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    case_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cases.id"), nullable=False, index=True)
+    author_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Denormalized at write time - same reasoning as ExpertReview.
+    # reviewer_role: a user's roles can change later, this records what
+    # was true when the message was actually sent.
+    author_role: Mapped[str] = mapped_column(String, nullable=False)
+    body: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[CaseMessageKind] = mapped_column(
+        SAEnum(CaseMessageKind, name="case_message_kind"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    case: Mapped["Case"] = relationship()
+    author: Mapped["User"] = relationship()
 
 
 class Product(Base):

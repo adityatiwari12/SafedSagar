@@ -14,9 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_db
 from app.authz.constants import Permission, RoleName
-from app.authz.service import AuthzContext, can_access_resource, has_any_grant, require_permission
-from app.cases.schemas import CaseOut, CloseCaseRequest, ReviewActionOut, ReviewActionRequest
-from app.db.models import AuditLogEntry, Case, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction, Product, User
+from app.authz.service import AuthzContext, can_access_resource, has_any_grant, load_authz_context, require_permission
+from app.cases.schemas import (
+    CaseMessageCreate, CaseMessageOut, CaseOut, CloseCaseRequest, ReviewActionOut, ReviewActionRequest,
+)
+from app.db.models import (
+    AuditLogEntry, Case, CaseMessage, CaseMessageKind, CaseQueue, CaseStatus, ExpertReview, ExpertReviewAction,
+    Product, User,
+)
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -42,6 +47,16 @@ _ACTION_PERMISSION: dict[ExpertReviewAction, str] = {
     ExpertReviewAction.reject: Permission.REVIEW_REJECT,
     ExpertReviewAction.escalate: Permission.REVIEW_ESCALATE,
     ExpertReviewAction.request_info: Permission.REVIEW_APPROVE,
+}
+
+# Which CaseMessageKind values each side of a case's message thread may
+# post. Server-enforced (never trust the client to self-limit) - a plain
+# user may ask a follow-up or answer a request for info, but only the
+# assigned reviewer may ask for more info or send the substantive
+# "expert_response" (spec Phase 23's expert-escalation loop).
+_USER_ALLOWED_MESSAGE_KINDS = {CaseMessageKind.note, CaseMessageKind.info_response}
+_REVIEWER_ALLOWED_MESSAGE_KINDS = {
+    CaseMessageKind.note, CaseMessageKind.info_request, CaseMessageKind.expert_response,
 }
 
 
@@ -248,3 +263,125 @@ async def review_case(
     await db.commit()
     await db.refresh(review)
     return ReviewActionOut(id=review.id, case_id=case.id, action=review.action.value, notes=review.notes, created_at=review.created_at)
+
+
+def _case_message_side(ctx: AuthzContext, case: Case) -> str | None:
+    """Which side of a case's message thread the caller is on: its own
+    user, or its assigned reviewer (the same ownership check claim/close/
+    review already use - can_access_resource's assigned_to_user_id match,
+    NOT every reviewer who could see the case in a queue listing). Neither
+    -> None, the caller gets a 403.
+
+    Reviewer is checked first: the unlikely case where the same account
+    is both the case's owner and its assigned reviewer should get the
+    reviewer's (strictly broader) kind set, not silently fall back to the
+    user's narrower one.
+    """
+    if has_any_grant(ctx, Permission.CASE_VIEW_QUEUE) and can_access_resource(ctx, case):
+        return "reviewer"
+    if case.user_id == ctx.user.id and has_any_grant(ctx, Permission.CASE_VIEW_OWN):
+        return "user"
+    return None
+
+
+async def _to_case_message_out(db: AsyncSession, message: CaseMessage) -> CaseMessageOut:
+    author = await db.get(User, message.author_user_id)
+    return CaseMessageOut(
+        id=message.id,
+        case_id=message.case_id,
+        author_user_id=message.author_user_id,
+        author_email=author.email if author else "",
+        author_role=message.author_role,
+        body=message.body,
+        kind=message.kind.value,
+        created_at=message.created_at,
+    )
+
+
+@router.get("/{case_id}/messages", response_model=list[CaseMessageOut])
+async def list_case_messages(
+    case_id: uuid.UUID,
+    ctx: AuthzContext = Depends(load_authz_context),
+    db: AsyncSession = Depends(get_db),
+) -> list[CaseMessageOut]:
+    """Full message thread for a case, oldest first. `require_permission`
+    only expresses a single permission key; a user (case.view_own) and a
+    reviewer (case.view_queue) both hit this same endpoint, so the OR is
+    checked inline via `_case_message_side`, the same way list_cases/
+    review_case already do custom checks past the route-entry dependency."""
+    case = await db.get(Case, case_id)
+    if case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    if _case_message_side(ctx, case) is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized for this case")
+
+    result = await db.execute(
+        select(CaseMessage).where(CaseMessage.case_id == case_id).order_by(CaseMessage.created_at.asc())
+    )
+    messages = list(result.scalars().all())
+    return [await _to_case_message_out(db, m) for m in messages]
+
+
+@router.post("/{case_id}/messages", response_model=CaseMessageOut, status_code=status.HTTP_201_CREATED)
+async def create_case_message(
+    case_id: uuid.UUID,
+    payload: CaseMessageCreate,
+    ctx: AuthzContext = Depends(load_authz_context),
+    db: AsyncSession = Depends(get_db),
+) -> CaseMessageOut:
+    case = await db.get(Case, case_id)
+    if case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+
+    side = _case_message_side(ctx, case)
+    if side is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized for this case")
+
+    try:
+        kind = CaseMessageKind(payload.kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid kind") from exc
+
+    allowed_kinds = _REVIEWER_ALLOWED_MESSAGE_KINDS if side == "reviewer" else _USER_ALLOWED_MESSAGE_KINDS
+    if kind not in allowed_kinds:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"A {side} may not post a '{kind.value}' message",
+        )
+
+    if side == "reviewer":
+        role_names = await _caller_role_names(ctx, db)
+        author_role = next((r for r in sorted(role_names) if r in _ROLE_QUEUE), "facilitator")
+    else:
+        author_role = "user"
+
+    message = CaseMessage(
+        case_id=case.id,
+        author_user_id=ctx.user.id,
+        author_role=author_role,
+        body=payload.body,
+        kind=kind,
+    )
+    db.add(message)
+
+    # request_info/info_response are the one real state transition this
+    # thread drives (spec's "additional information if required" step) -
+    # everything else (including expert_response) leaves case.status
+    # alone; closing stays close_case's separate, explicit action.
+    if kind == CaseMessageKind.info_request:
+        case.status = CaseStatus.awaiting_user_input
+    elif kind == CaseMessageKind.info_response and case.status == CaseStatus.awaiting_user_input:
+        if case.assigned_to_user_id is not None:
+            case.status = CaseStatus.in_progress
+
+    db.add(
+        AuditLogEntry(
+            actor_user_id=ctx.user.id,
+            action="case.message",
+            detail={"case_id": str(case.id), "kind": kind.value},
+        )
+    )
+
+    await db.commit()
+    await db.refresh(message)
+    return await _to_case_message_out(db, message)
