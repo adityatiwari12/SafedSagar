@@ -5,23 +5,41 @@ import { ApiError } from '../api/http'
 import { CaseItem } from '../api/casesApi'
 import { StatusBadge as CaseStatusBadge, RiskBadge } from '../cases/caseBadges'
 import { useLanguage } from '../i18n/LanguageContext'
+import type { TranslateFn } from '../i18n/types'
 import {
   EmptyState,
   ErrorState,
+  EvidenceList,
   LoadingState,
   PageHeader,
   Panel,
   StatusBadge,
 } from '../ui/primitives'
 import {
+  ABS_ENTITY_CATEGORIES,
+  ABS_ORIGINS,
+  ABS_PURPOSES,
+  ABS_SOURCINGS,
+  AbsAssessment,
+  AbsAssessmentInput,
+  AbsEntityCategory,
+  AbsOrigin,
+  AbsPurpose,
+  AbsSourcing,
   ComplianceEvidence,
   ComplianceItem,
   ComplianceItemPatch,
   ComplianceStatus,
   ComplianceSummary,
   COMPLIANCE_STATUSES,
+  DOC_KINDS,
+  DOCUMENT_MAX_UPLOAD_BYTES,
+  DocKind,
+  DocumentMeta,
+  humanFileSize,
   humanizeArea,
   humanizeClassification,
+  humanizeDocKind,
   PRODUCT_CLASSIFICATIONS,
   Product,
   ProductClassification,
@@ -29,7 +47,15 @@ import {
   summarizeCompliance,
 } from '../api/productsApi'
 
-type TabId = 'overview' | 'formulation' | 'classification' | 'pathways' | 'compliance' | 'assessments'
+type TabId =
+  | 'overview'
+  | 'formulation'
+  | 'classification'
+  | 'pathways'
+  | 'compliance'
+  | 'abs'
+  | 'documents'
+  | 'assessments'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -37,8 +63,25 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'classification', label: 'Classification' },
   { id: 'pathways', label: 'Pathways' },
   { id: 'compliance', label: 'Compliance' },
+  { id: 'abs', label: 'ABS' },
+  { id: 'documents', label: 'Documents' },
   { id: 'assessments', label: 'Assessments' },
 ]
+
+/** Creates a temporary object URL and clicks a throwaway <a download> to
+ * trigger a real browser download/open — used for both document downloads
+ * and the report PDF, which both arrive as a Blob (not JSON) fetched with
+ * the auth header via apiFetchBlob. */
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 const COMPLIANCE_STATUS_TONE: Record<ComplianceStatus, string> = {
   unknown: 'draft',
@@ -52,15 +95,7 @@ function complianceStatusLabel(statusValue: ComplianceStatus): string {
   return statusValue.replace(/_/g, ' ')
 }
 
-const PLANNED_MODULES = [
-  'IP Strategy',
-  'Prior Art',
-  'Regulatory detail',
-  'TK',
-  'ABS',
-  'Documents',
-  'Activity',
-] as const
+const PLANNED_MODULES = ['IP Strategy', 'Prior Art', 'Regulatory detail', 'TK', 'Activity'] as const
 
 function statusSummary(status: Record<string, unknown> | null | undefined): string {
   if (!status || Object.keys(status).length === 0) return 'Not assessed'
@@ -332,14 +367,42 @@ function InsightList({
   )
 }
 
-function OverviewTab({ product, latestCase }: { product: Product; latestCase: CaseItem | null }) {
+function OverviewTab({
+  product,
+  latestCase,
+  t,
+  reportLoading,
+  reportError,
+  onDownloadReport,
+}: {
+  product: Product
+  latestCase: CaseItem | null
+  t: TranslateFn
+  reportLoading: boolean
+  reportError: string | null
+  onDownloadReport: () => void
+}) {
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap justify-end gap-2">
-        <AskAboutProductButton product={product} />
-        <Link to="/classify" className="gov-btn-secondary">
-          Classification wizard
-        </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <button
+            type="button"
+            className="gov-btn-primary"
+            onClick={onDownloadReport}
+            disabled={reportLoading}
+          >
+            {reportLoading ? t('report.generating') : t('report.download')}
+          </button>
+          {reportLoading && <p className="mt-1 text-xs text-ink-muted">{t('report.hint')}</p>}
+          {reportError && <p className="mt-1 text-xs text-red-900">{reportError}</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <AskAboutProductButton product={product} />
+          <Link to="/classify" className="gov-btn-secondary">
+            Classification wizard
+          </Link>
+        </div>
       </div>
       <InsightsPanel product={product} latestCase={latestCase} />
       <Panel title="Record summary">
@@ -496,8 +559,9 @@ function PathwaysTab({ product }: { product: Product }) {
           Planned pathway modules
         </p>
         <p className="mt-1 text-sm text-ink-muted">
-          Deeper IP Strategy, Prior Art, Regulatory, TK, ABS, Documents and Activity views are
-          staged for later phases. Current fields above remain the source of truth for MVP.
+          Deeper IP Strategy, Prior Art, Regulatory, TK and Activity views are staged for later
+          phases. Current fields above remain the source of truth for MVP. See the ABS and
+          Documents tabs for the modules now live.
         </p>
         <ul className="mt-2 flex flex-wrap gap-2">
           {PLANNED_MODULES.map((m) => (
@@ -755,6 +819,773 @@ function ComplianceTab({
             ))}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ABS tab
+// ---------------------------------------------------------------------------
+
+type AbsAnswers = Required<AbsAssessmentInput>
+
+function answersFromAssessment(a: AbsAssessment): AbsAnswers {
+  return {
+    is_biological_resource: a.is_biological_resource,
+    resource_description: a.resource_description,
+    origin: a.origin,
+    sourcing: a.sourcing,
+    involves_traditional_knowledge: a.involves_traditional_knowledge,
+    purpose: a.purpose,
+    user_entity_category: a.user_entity_category,
+  }
+}
+
+const ABS_STEPS = [
+  'is_biological_resource',
+  'resource_description',
+  'origin',
+  'sourcing',
+  'involves_traditional_knowledge',
+  'purpose',
+  'user_entity_category',
+] as const
+type AbsStepId = (typeof ABS_STEPS)[number]
+
+const ABS_ORIGIN_LABEL: Record<AbsOrigin, string> = {
+  india: 'abs.originIndia',
+  outside_india: 'abs.originOutsideIndia',
+  unknown: 'abs.originUnknown',
+}
+const ABS_SOURCING_LABEL: Record<AbsSourcing, string> = {
+  wild_collected: 'abs.sourcingWild',
+  cultivated: 'abs.sourcingCultivated',
+  both: 'abs.sourcingBoth',
+  unknown: 'abs.sourcingUnknown',
+}
+const ABS_PURPOSE_LABEL: Record<AbsPurpose, string> = {
+  commercial: 'abs.purposeCommercial',
+  research_only: 'abs.purposeResearchOnly',
+  unknown: 'abs.purposeUnknown',
+}
+const ABS_ENTITY_LABEL: Record<AbsEntityCategory, string> = {
+  indian_individual: 'abs.entityIndianIndividual',
+  indian_company: 'abs.entityIndianCompany',
+  foreign_entity: 'abs.entityForeign',
+  unknown: 'abs.entityUnknown',
+}
+
+function BooleanToggle({
+  value,
+  onChange,
+  t,
+}: {
+  value: boolean | null
+  onChange: (v: boolean | null) => void
+  t: TranslateFn
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group">
+      <button
+        type="button"
+        className={`gov-btn-secondary ${value === true ? '!border-forest !text-forest' : ''}`}
+        aria-pressed={value === true}
+        onClick={() => onChange(true)}
+      >
+        {t('abs.yes')}
+      </button>
+      <button
+        type="button"
+        className={`gov-btn-secondary ${value === false ? '!border-forest !text-forest' : ''}`}
+        aria-pressed={value === false}
+        onClick={() => onChange(false)}
+      >
+        {t('abs.no')}
+      </button>
+      <button
+        type="button"
+        className={`gov-btn-secondary ${value === null ? '!border-forest !text-forest' : ''}`}
+        aria-pressed={value === null}
+        onClick={() => onChange(null)}
+      >
+        {t('abs.notSure')}
+      </button>
+    </div>
+  )
+}
+
+function AbsSelectStep<T extends string>({
+  value,
+  options,
+  labelKeys,
+  t,
+  onChange,
+}: {
+  value: T | null
+  options: readonly T[]
+  labelKeys: Record<T, string>
+  t: TranslateFn
+  onChange: (v: T | null) => void
+}) {
+  return (
+    <select
+      id="abs-select-step"
+      className="gov-input"
+      value={value ?? ''}
+      onChange={(e) => onChange((e.target.value || null) as T | null)}
+    >
+      <option value="">{t('abs.notAnsweredYet')}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>
+          {t(labelKeys[opt] as Parameters<TranslateFn>[0])}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function AbsStepField({
+  stepId,
+  answers,
+  update,
+  t,
+}: {
+  stepId: AbsStepId
+  answers: AbsAnswers
+  update: <K extends keyof AbsAnswers>(key: K, value: AbsAnswers[K]) => void
+  t: TranslateFn
+}) {
+  switch (stepId) {
+    case 'is_biological_resource':
+      return (
+        <div>
+          <label className="gov-label">{t('abs.qIsBiologicalResource')}</label>
+          <BooleanToggle
+            value={answers.is_biological_resource}
+            onChange={(v) => update('is_biological_resource', v)}
+            t={t}
+          />
+        </div>
+      )
+    case 'resource_description':
+      return (
+        <div>
+          <label className="gov-label" htmlFor="abs-resource-description">
+            {t('abs.qResourceDescription')}
+          </label>
+          <textarea
+            id="abs-resource-description"
+            className="gov-input"
+            rows={3}
+            placeholder={t('abs.resourceDescriptionPlaceholder')}
+            value={answers.resource_description ?? ''}
+            onChange={(e) => update('resource_description', e.target.value || null)}
+          />
+        </div>
+      )
+    case 'origin':
+      return (
+        <div>
+          <label className="gov-label" htmlFor="abs-select-step">
+            {t('abs.qOrigin')}
+          </label>
+          <AbsSelectStep
+            value={answers.origin}
+            options={ABS_ORIGINS}
+            labelKeys={ABS_ORIGIN_LABEL}
+            t={t}
+            onChange={(v) => update('origin', v)}
+          />
+        </div>
+      )
+    case 'sourcing':
+      return (
+        <div>
+          <label className="gov-label" htmlFor="abs-select-step">
+            {t('abs.qSourcing')}
+          </label>
+          <AbsSelectStep
+            value={answers.sourcing}
+            options={ABS_SOURCINGS}
+            labelKeys={ABS_SOURCING_LABEL}
+            t={t}
+            onChange={(v) => update('sourcing', v)}
+          />
+        </div>
+      )
+    case 'involves_traditional_knowledge':
+      return (
+        <div>
+          <label className="gov-label">{t('abs.qInvolvesTk')}</label>
+          <BooleanToggle
+            value={answers.involves_traditional_knowledge}
+            onChange={(v) => update('involves_traditional_knowledge', v)}
+            t={t}
+          />
+        </div>
+      )
+    case 'purpose':
+      return (
+        <div>
+          <label className="gov-label" htmlFor="abs-select-step">
+            {t('abs.qPurpose')}
+          </label>
+          <AbsSelectStep
+            value={answers.purpose}
+            options={ABS_PURPOSES}
+            labelKeys={ABS_PURPOSE_LABEL}
+            t={t}
+            onChange={(v) => update('purpose', v)}
+          />
+        </div>
+      )
+    case 'user_entity_category':
+      return (
+        <div>
+          <label className="gov-label" htmlFor="abs-select-step">
+            {t('abs.qEntityCategory')}
+          </label>
+          <AbsSelectStep
+            value={answers.user_entity_category}
+            options={ABS_ENTITY_CATEGORIES}
+            labelKeys={ABS_ENTITY_LABEL}
+            t={t}
+            onChange={(v) => update('user_entity_category', v)}
+          />
+        </div>
+      )
+    default:
+      return null
+  }
+}
+
+function AbsWizard({
+  initial,
+  busy,
+  error,
+  t,
+  onCancel,
+  onSave,
+}: {
+  initial: AbsAnswers
+  busy: boolean
+  error: string | null
+  t: TranslateFn
+  onCancel?: () => void
+  onSave: (answers: AbsAnswers) => Promise<void>
+}) {
+  const [answers, setAnswers] = useState<AbsAnswers>(initial)
+  const [stepIndex, setStepIndex] = useState(0)
+  const stepId = ABS_STEPS[stepIndex]
+  const isLast = stepIndex === ABS_STEPS.length - 1
+
+  function update<K extends keyof AbsAnswers>(key: K, value: AbsAnswers[K]) {
+    setAnswers((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function save() {
+    try {
+      await onSave(answers)
+    } catch {
+      // error already surfaced via the `error` prop — stay on this step so
+      // no earlier-step answer already in local state gets lost.
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="border border-saffron/50 bg-orange-50 px-3 py-2 text-xs text-ink">
+        {t('abs.disclaimer')}
+      </p>
+      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        {t('abs.stepLabel')
+          .replace('{step}', String(stepIndex + 1))
+          .replace('{total}', String(ABS_STEPS.length))}
+      </p>
+      <AbsStepField stepId={stepId} answers={answers} update={update} t={t} />
+      {error && <ErrorState message={error} />}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-surface-border pt-3">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="gov-btn-secondary"
+            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+            disabled={stepIndex === 0 || busy}
+          >
+            {t('abs.back')}
+          </button>
+          {!isLast && (
+            <button
+              type="button"
+              className="gov-btn-secondary"
+              onClick={() => setStepIndex((i) => Math.min(ABS_STEPS.length - 1, i + 1))}
+              disabled={busy}
+            >
+              {t('abs.next')}
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {onCancel && (
+            <button type="button" className="gov-btn-secondary" onClick={onCancel} disabled={busy}>
+              {t('abs.cancelEdit')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="gov-btn-primary"
+            onClick={() => void save()}
+            disabled={busy}
+          >
+            {busy ? t('abs.saving') : isLast ? t('abs.saveAssessment') : t('abs.saveAndExit')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ABS_STATUS_TONE: Record<AbsAssessment['status'], string> = {
+  not_started: 'draft',
+  in_progress: 'in_progress',
+  complete: 'resolved',
+}
+
+const ABS_STATUS_LABEL: Record<AbsAssessment['status'], string> = {
+  not_started: 'abs.statusNotStarted',
+  in_progress: 'abs.statusInProgress',
+  complete: 'abs.statusComplete',
+}
+
+function AbsSummary({
+  assessment,
+  evidenceLoading,
+  evidenceError,
+  t,
+  onEdit,
+  onFindEvidence,
+}: {
+  assessment: AbsAssessment
+  evidenceLoading: boolean
+  evidenceError: string | null
+  t: TranslateFn
+  onEdit: () => void
+  onFindEvidence: () => void
+}) {
+  const answers = answersFromAssessment(assessment)
+  const yesNo = (v: boolean | null) => (v == null ? t('abs.notAnsweredYet') : v ? t('abs.yes') : t('abs.no'))
+  const provisions = assessment.applicable_provisions ?? []
+
+  return (
+    <div className="space-y-4">
+      <p className="border border-saffron/50 bg-orange-50 px-3 py-2 text-xs text-ink">
+        {t('abs.disclaimer')}
+      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <StatusBadge
+          status={ABS_STATUS_TONE[assessment.status]}
+          label={t(ABS_STATUS_LABEL[assessment.status] as Parameters<TranslateFn>[0])}
+        />
+        <button type="button" className="gov-btn-secondary !py-1.5 text-sm" onClick={onEdit}>
+          {t('abs.editCta')}
+        </button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={t('abs.qIsBiologicalResource')} value={yesNo(answers.is_biological_resource)} />
+        <Field label={t('abs.qResourceDescription')} value={answers.resource_description} />
+        <Field
+          label={t('abs.qOrigin')}
+          value={answers.origin ? t(ABS_ORIGIN_LABEL[answers.origin] as Parameters<TranslateFn>[0]) : null}
+        />
+        <Field
+          label={t('abs.qSourcing')}
+          value={answers.sourcing ? t(ABS_SOURCING_LABEL[answers.sourcing] as Parameters<TranslateFn>[0]) : null}
+        />
+        <Field label={t('abs.qInvolvesTk')} value={yesNo(answers.involves_traditional_knowledge)} />
+        <Field
+          label={t('abs.qPurpose')}
+          value={answers.purpose ? t(ABS_PURPOSE_LABEL[answers.purpose] as Parameters<TranslateFn>[0]) : null}
+        />
+        <Field
+          label={t('abs.qEntityCategory')}
+          value={
+            answers.user_entity_category
+              ? t(ABS_ENTITY_LABEL[answers.user_entity_category] as Parameters<TranslateFn>[0])
+              : null
+          }
+        />
+      </div>
+      <div className="border-t border-surface-border pt-3">
+        <h3 className="text-sm font-bold text-navy">{t('abs.frameworkTitle')}</h3>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-ink">
+          {assessment.preliminary_framework || t('abs.noFrameworkYet')}
+        </p>
+      </div>
+      {assessment.next_steps && assessment.next_steps.length > 0 && (
+        <div>
+          <h3 className="text-sm font-bold text-navy">{t('abs.nextStepsTitle')}</h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink-muted">
+            {assessment.next_steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="border-t border-surface-border pt-3">
+        <button
+          type="button"
+          className="gov-btn-secondary !py-1.5 text-sm"
+          onClick={onFindEvidence}
+          disabled={evidenceLoading}
+        >
+          {evidenceLoading ? t('abs.findingEvidence') : t('abs.findEvidence')}
+        </button>
+        {evidenceLoading && (
+          <p className="mt-2 text-xs text-ink-muted" role="status">
+            {t('abs.evidenceHint')}
+          </p>
+        )}
+        {evidenceError && <ErrorState message={evidenceError} />}
+        {provisions.length > 0 ? (
+          <div className="mt-3">
+            <h3 className="text-sm font-bold text-navy">{t('abs.evidenceTitle')}</h3>
+            <div className="mt-2">
+              <EvidenceList
+                items={provisions.map((p) => ({
+                  title: p.title,
+                  authority: p.authority ?? undefined,
+                  provision: p.section_or_article ?? undefined,
+                  sourceUrl: p.source_url ?? undefined,
+                  docId: p.doc_id,
+                }))}
+              />
+            </div>
+          </div>
+        ) : (
+          !evidenceLoading && <p className="mt-2 text-xs text-ink-muted">{t('abs.evidenceEmpty')}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function AbsTab({
+  assessment,
+  loading,
+  error,
+  saving,
+  evidenceLoading,
+  actionError,
+  t,
+  onRetry,
+  onSave,
+  onFindEvidence,
+}: {
+  assessment: AbsAssessment | null
+  loading: boolean
+  error: string | null
+  saving: boolean
+  evidenceLoading: boolean
+  actionError: string | null
+  t: TranslateFn
+  onRetry: () => void
+  onSave: (answers: AbsAnswers) => Promise<void>
+  onFindEvidence: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+
+  if (loading) return <LoadingState label={t('abs.loading')} />
+  if (error) {
+    return (
+      <div>
+        <ErrorState message={error} />
+        <button type="button" className="gov-btn-secondary mt-2 !py-1 text-xs" onClick={onRetry}>
+          {t('abs.retry')}
+        </button>
+      </div>
+    )
+  }
+  if (!assessment) return null
+
+  const hasSaved = assessment.id !== null
+  const showWizard = !hasSaved || editing
+
+  if (showWizard) {
+    return (
+      <AbsWizard
+        key={assessment.updated_at ?? 'new'}
+        initial={answersFromAssessment(assessment)}
+        busy={saving}
+        error={actionError}
+        t={t}
+        onCancel={hasSaved ? () => setEditing(false) : undefined}
+        onSave={async (answers) => {
+          await onSave(answers)
+          setEditing(false)
+        }}
+      />
+    )
+  }
+
+  return (
+    <AbsSummary
+      assessment={assessment}
+      evidenceLoading={evidenceLoading}
+      evidenceError={actionError}
+      t={t}
+      onEdit={() => setEditing(true)}
+      onFindEvidence={onFindEvidence}
+    />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Documents tab
+// ---------------------------------------------------------------------------
+
+const DOC_KIND_LABEL: Record<DocKind, string> = {
+  label: 'documents.kindLabelDoc',
+  certificate: 'documents.kindCertificate',
+  formulation_sheet: 'documents.kindFormulationSheet',
+  correspondence: 'documents.kindCorrespondence',
+  other: 'documents.kindOther',
+}
+
+function DocumentUploadForm({
+  productId,
+  t,
+  onUploaded,
+}: {
+  productId: string
+  t: TranslateFn
+  onUploaded: (doc: DocumentMeta) => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [docKind, setDocKind] = useState<DocKind>('other')
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
+  const sizeWarning = file != null && file.size > DOCUMENT_MAX_UPLOAD_BYTES
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!file) return
+    setError(null)
+    setUploading(true)
+    setProgress(0)
+    try {
+      const doc = await productsApi.uploadDocument({ file, docKind, productId }, setProgress)
+      onUploaded(doc)
+      setFile(null)
+      const input = document.getElementById('document-upload-file') as HTMLInputElement | null
+      if (input) input.value = ''
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <form className="space-y-3 border border-surface-border bg-ivory/40 p-4" onSubmit={submit}>
+      <h3 className="text-sm font-bold text-navy">{t('documents.uploadTitle')}</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="gov-label" htmlFor="document-upload-file">
+            {t('documents.fileLabel')}
+          </label>
+          <input
+            id="document-upload-file"
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+            className="gov-input"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <div>
+          <label className="gov-label" htmlFor="document-upload-kind">
+            {t('documents.kindLabel')}
+          </label>
+          <select
+            id="document-upload-kind"
+            className="gov-input"
+            value={docKind}
+            onChange={(e) => setDocKind(e.target.value as DocKind)}
+          >
+            {DOC_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {t(DOC_KIND_LABEL[k] as Parameters<TranslateFn>[0])}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-ink-faint">{t('documents.uploadHintTypes')}</p>
+      {sizeWarning && <p className="text-xs font-semibold text-amber-900">{t('documents.sizeWarning')}</p>}
+      {error && <ErrorState message={error} />}
+      {uploading && (
+        <p className="text-xs text-ink-muted" role="status">
+          {t('documents.uploading')} {progress}%
+        </p>
+      )}
+      <button type="submit" className="gov-btn-primary !py-1.5 text-sm" disabled={!file || uploading}>
+        {uploading ? t('documents.uploading') : t('documents.uploadButton')}
+      </button>
+    </form>
+  )
+}
+
+function DocumentRow({
+  doc,
+  t,
+  onDeleted,
+}: {
+  doc: DocumentMeta
+  t: TranslateFn
+  onDeleted: (id: string) => void
+}) {
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  async function download() {
+    setDownloadError(null)
+    setDownloading(true)
+    try {
+      const { blob, filename } = await productsApi.downloadDocument(doc.id)
+      triggerBrowserDownload(blob, filename ?? doc.filename)
+    } catch (err) {
+      setDownloadError(err instanceof ApiError ? err.message : 'Failed to download document')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  async function confirmDelete() {
+    setDeleteError(null)
+    setDeleting(true)
+    try {
+      await productsApi.removeDocument(doc.id)
+      onDeleted(doc.id)
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Failed to delete document')
+      setDeleting(false)
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <tr className="border-b border-line/60 align-top">
+      <td className="py-2 pr-4 text-ink">{doc.filename}</td>
+      <td className="py-2 pr-4 text-ink-muted">{humanizeDocKind(doc.doc_kind)}</td>
+      <td className="py-2 pr-4 text-ink-muted">{humanFileSize(doc.size_bytes)}</td>
+      <td className="py-2 pr-4 text-ink-muted">{new Date(doc.created_at).toLocaleDateString()}</td>
+      <td className="py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="gov-btn-secondary !py-1 text-xs"
+            onClick={() => void download()}
+            disabled={downloading}
+          >
+            {downloading ? t('documents.downloading') : t('documents.download')}
+          </button>
+          {!confirming ? (
+            <button
+              type="button"
+              className="gov-btn-danger !py-1 text-xs"
+              onClick={() => setConfirming(true)}
+            >
+              {t('documents.delete')}
+            </button>
+          ) : (
+            <span className="flex flex-wrap items-center gap-1.5 text-xs">
+              {t('documents.deleteConfirm')}
+              <button
+                type="button"
+                className="gov-btn-danger !py-1 text-xs"
+                onClick={() => void confirmDelete()}
+                disabled={deleting}
+              >
+                {deleting ? t('documents.deleting') : t('documents.deleteConfirmYes')}
+              </button>
+              <button
+                type="button"
+                className="gov-btn-secondary !py-1 text-xs"
+                onClick={() => setConfirming(false)}
+                disabled={deleting}
+              >
+                {t('documents.deleteConfirmNo')}
+              </button>
+            </span>
+          )}
+        </div>
+        {downloadError && <p className="mt-1 text-xs text-red-900">{downloadError}</p>}
+        {deleteError && <p className="mt-1 text-xs text-red-900">{deleteError}</p>}
+      </td>
+    </tr>
+  )
+}
+
+export function DocumentsTab({
+  productId,
+  documents,
+  loading,
+  error,
+  t,
+  onRetry,
+  onUploaded,
+  onDeleted,
+}: {
+  productId: string
+  documents: DocumentMeta[] | null
+  loading: boolean
+  error: string | null
+  t: TranslateFn
+  onRetry: () => void
+  onUploaded: (doc: DocumentMeta) => void
+  onDeleted: (id: string) => void
+}) {
+  if (loading) return <LoadingState label={t('documents.loading')} />
+  if (error) {
+    return (
+      <div>
+        <ErrorState message={error} />
+        <button type="button" className="gov-btn-secondary mt-2 !py-1 text-xs" onClick={onRetry}>
+          {t('documents.retry')}
+        </button>
+      </div>
+    )
+  }
+
+  const isEmpty = !documents || documents.length === 0
+
+  return (
+    <div className="space-y-4">
+      <DocumentUploadForm productId={productId} t={t} onUploaded={onUploaded} />
+      {isEmpty ? (
+        <EmptyState title={t('documents.emptyTitle')} description={t('documents.emptyBody')} />
+      ) : (
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-faint">
+              <th className="py-1.5 pr-4">{t('documents.filenameHeader')}</th>
+              <th className="py-1.5 pr-4">{t('documents.kindHeader')}</th>
+              <th className="py-1.5 pr-4">{t('documents.sizeHeader')}</th>
+              <th className="py-1.5 pr-4">{t('documents.uploadedHeader')}</th>
+              <th className="py-1.5">{t('documents.actionsHeader')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {documents!.map((doc) => (
+              <DocumentRow key={doc.id} doc={doc} t={t} onDeleted={onDeleted} />
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )
@@ -1060,6 +1891,18 @@ export default function ProductDetailPage() {
   const [complianceGenerating, setComplianceGenerating] = useState(false)
   const [complianceEvidenceLoading, setComplianceEvidenceLoading] = useState(false)
   const [complianceActionError, setComplianceActionError] = useState<string | null>(null)
+  const [absAssessment, setAbsAssessment] = useState<AbsAssessment | null>(null)
+  const [absLoading, setAbsLoading] = useState(true)
+  const [absError, setAbsError] = useState<string | null>(null)
+  const [absSaving, setAbsSaving] = useState(false)
+  const [absEvidenceLoading, setAbsEvidenceLoading] = useState(false)
+  const [absActionError, setAbsActionError] = useState<string | null>(null)
+  const [documents, setDocuments] = useState<DocumentMeta[] | null>(null)
+  const [documentsLoading, setDocumentsLoading] = useState(true)
+  const [documentsError, setDocumentsError] = useState<string | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
+  const { t } = useLanguage()
 
   async function load() {
     if (!id) return
@@ -1157,6 +2000,86 @@ export default function ProductDetailPage() {
     }
   }
 
+  async function loadAbs(productId: string) {
+    setAbsLoading(true)
+    setAbsError(null)
+    try {
+      const data = await productsApi.getAbsAssessment(productId)
+      setAbsAssessment(data)
+    } catch (err) {
+      setAbsError(err instanceof ApiError ? err.message : 'Failed to load ABS assessment')
+    } finally {
+      setAbsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (product?.id) void loadAbs(product.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id])
+
+  /** Always sends the complete current answer set (PUT is a full replace
+   * server-side), whether called from the wizard's final save or from the
+   * summary's "Find supporting sources" re-run on the already-saved
+   * answers. */
+  async function handleSaveAbs(answers: AbsAssessmentInput, withEvidence: boolean) {
+    if (!product) return
+    setAbsActionError(null)
+    if (withEvidence) setAbsEvidenceLoading(true)
+    else setAbsSaving(true)
+    try {
+      const updated = await productsApi.saveAbsAssessment(product.id, answers, withEvidence)
+      setAbsAssessment(updated)
+    } catch (err) {
+      setAbsActionError(err instanceof ApiError ? err.message : 'Failed to save ABS assessment')
+      throw err
+    } finally {
+      if (withEvidence) setAbsEvidenceLoading(false)
+      else setAbsSaving(false)
+    }
+  }
+
+  async function handleFindAbsEvidence() {
+    if (!absAssessment) return
+    try {
+      await handleSaveAbs(answersFromAssessment(absAssessment), true)
+    } catch {
+      // error already surfaced via absActionError
+    }
+  }
+
+  async function loadDocuments(productId: string) {
+    setDocumentsLoading(true)
+    setDocumentsError(null)
+    try {
+      const data = await productsApi.listDocuments(productId)
+      setDocuments(data)
+    } catch (err) {
+      setDocumentsError(err instanceof ApiError ? err.message : 'Failed to load documents')
+    } finally {
+      setDocumentsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (product?.id) void loadDocuments(product.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id])
+
+  async function handleDownloadReport() {
+    if (!product) return
+    setReportError(null)
+    setReportLoading(true)
+    try {
+      const { blob, filename } = await productsApi.downloadReport(product.id)
+      triggerBrowserDownload(blob, filename ?? `${product.name}-assessment-report.pdf`)
+    } catch (err) {
+      setReportError(err instanceof ApiError ? err.message : 'Failed to generate report')
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
   const latestCase = cases?.[0] ?? null
 
   return (
@@ -1239,7 +2162,16 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="border border-surface-border bg-white p-4">
-              {tab === 'overview' && <OverviewTab product={product} latestCase={latestCase} />}
+              {tab === 'overview' && (
+                <OverviewTab
+                  product={product}
+                  latestCase={latestCase}
+                  t={t}
+                  reportLoading={reportLoading}
+                  reportError={reportError}
+                  onDownloadReport={() => void handleDownloadReport()}
+                />
+              )}
               {tab === 'formulation' && <FormulationTab product={product} />}
               {tab === 'classification' && <ClassificationTab product={product} />}
               {tab === 'pathways' && <PathwaysTab product={product} />}
@@ -1255,6 +2187,34 @@ export default function ProductDetailPage() {
                   onRetry={() => void loadCompliance(product.id)}
                   onGenerate={(withEvidence) => void handleGenerateCompliance(withEvidence)}
                   onUpdateItem={(itemId, patch) => void handleUpdateComplianceItem(itemId, patch)}
+                />
+              )}
+              {tab === 'abs' && (
+                <AbsTab
+                  assessment={absAssessment}
+                  loading={absLoading}
+                  error={absError}
+                  saving={absSaving}
+                  evidenceLoading={absEvidenceLoading}
+                  actionError={absActionError}
+                  t={t}
+                  onRetry={() => void loadAbs(product.id)}
+                  onSave={(answers) => handleSaveAbs(answers, false)}
+                  onFindEvidence={() => void handleFindAbsEvidence()}
+                />
+              )}
+              {tab === 'documents' && (
+                <DocumentsTab
+                  productId={product.id}
+                  documents={documents}
+                  loading={documentsLoading}
+                  error={documentsError}
+                  t={t}
+                  onRetry={() => void loadDocuments(product.id)}
+                  onUploaded={(doc) => setDocuments((cur) => (cur ? [doc, ...cur] : [doc]))}
+                  onDeleted={(docId) =>
+                    setDocuments((cur) => (cur ? cur.filter((d) => d.id !== docId) : cur))
+                  }
                 />
               )}
               {tab === 'assessments' && (

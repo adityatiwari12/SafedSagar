@@ -6,7 +6,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 // http(s)://host -> ws(s)://host, same base the REST calls above use -
 // keeps the WebSocket client (realChatApi.ts) from duplicating base-URL
@@ -40,4 +40,46 @@ export async function apiFetch<T>(
   }
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+/** Pulls a filename out of a `Content-Disposition: attachment; filename="..."`
+ * header. Returns null if the header is missing or unparseable so callers
+ * can fall back to a computed default. */
+export function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)
+  if (!match) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
+
+/** Fetches a binary response (PDF/document download) with the auth header,
+ * the same way apiFetch does for JSON — apiFetch can't be reused directly
+ * since it always parses the body as JSON. Errors are surfaced the same
+ * way (server's `detail` message, wrapped in ApiError) whenever the server
+ * manages to send a JSON error body; otherwise falls back to statusText. */
+export async function apiFetchBlob(
+  path: string,
+  token?: string | null,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const headers = new Headers()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
+  const response = await fetch(`${API_BASE}${path}`, { headers })
+  if (!response.ok) {
+    let detail = response.statusText
+    try {
+      const body = await response.json()
+      detail = body.detail ?? detail
+    } catch {
+      // response had no JSON body
+    }
+    throw new ApiError(response.status, detail)
+  }
+  const filename = filenameFromContentDisposition(response.headers.get('Content-Disposition'))
+  const blob = await response.blob()
+  return { blob, filename }
 }

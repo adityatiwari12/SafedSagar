@@ -216,3 +216,204 @@ test('summarizeCompliance tallies items by status into the summary shape the che
     total: 4,
   })
 })
+
+const ABS_RESPONSE = {
+  id: null,
+  product_id: 'p1',
+  is_biological_resource: null,
+  resource_description: null,
+  origin: null,
+  sourcing: null,
+  involves_traditional_knowledge: null,
+  purpose: null,
+  user_entity_category: null,
+  preliminary_framework: null,
+  applicable_provisions: null,
+  next_steps: null,
+  status: 'not_started',
+  updated_by_user_id: null,
+  created_at: null,
+  updated_at: null,
+}
+
+test('getAbsAssessment GETs /products/{id}/abs', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ABS_RESPONSE,
+  })
+
+  const assessment = await productsApi.getAbsAssessment('p1')
+
+  expect(assessment.status).toBe('not_started')
+  const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/products/p1/abs')
+  expect(init.method ?? 'GET').toBe('GET')
+})
+
+test('saveAbsAssessment PUTs the full answer set and appends with_evidence correctly', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ ...ABS_RESPONSE, id: 'abs-1', status: 'in_progress' }),
+  })
+
+  await productsApi.saveAbsAssessment('p1', { is_biological_resource: true, origin: 'india' }, true)
+
+  const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/products/p1/abs?with_evidence=true')
+  expect(init.method).toBe('PUT')
+  expect(JSON.parse(init.body)).toEqual({ is_biological_resource: true, origin: 'india' })
+})
+
+test('saveAbsAssessment defaults with_evidence to false', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ABS_RESPONSE,
+  })
+
+  await productsApi.saveAbsAssessment('p1', {})
+
+  const [url] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('with_evidence=false')
+})
+
+test('listDocuments GETs /documents with the product_id query param', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => [],
+  })
+
+  await productsApi.listDocuments('p1')
+
+  const [url] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/documents?product_id=p1')
+})
+
+test('removeDocument DELETEs /documents/{id}', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 204 })
+
+  await productsApi.removeDocument('d1')
+
+  const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/documents/d1')
+  expect(init.method).toBe('DELETE')
+})
+
+test('downloadDocument fetches the binary with the auth header and parses the filename from Content-Disposition', async () => {
+  const blob = new Blob(['pdf-bytes'])
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    headers: { get: (name: string) => (name === 'Content-Disposition' ? 'attachment; filename="label.pdf"' : null) },
+    blob: async () => blob,
+  })
+
+  const result = await productsApi.downloadDocument('d1')
+
+  expect(result.filename).toBe('label.pdf')
+  expect(result.blob).toBe(blob)
+  const [url] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/documents/d1/download')
+})
+
+test('downloadDocument surfaces a non-ok response as ApiError using the server detail', async () => {
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: false,
+    status: 403,
+    statusText: 'Forbidden',
+    json: async () => ({ detail: 'Not your document' }),
+  })
+
+  await expect(productsApi.downloadDocument('d1')).rejects.toMatchObject({
+    status: 403,
+    message: 'Not your document',
+  })
+})
+
+test('downloadReport GETs /products/{id}/report and returns the PDF blob', async () => {
+  const blob = new Blob(['%PDF-1.4'])
+  ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ok: true,
+    status: 200,
+    headers: {
+      get: (name: string) =>
+        name === 'Content-Disposition' ? 'attachment; filename="Ashwagandha-assessment-report.pdf"' : null,
+    },
+    blob: async () => blob,
+  })
+
+  const result = await productsApi.downloadReport('p1')
+
+  expect(result.filename).toBe('Ashwagandha-assessment-report.pdf')
+  const [url] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+  expect(url).toContain('/products/p1/report')
+})
+
+class MockXHR {
+  static instances: MockXHR[] = []
+  method = ''
+  url = ''
+  status = 0
+  statusText = ''
+  responseText = ''
+  upload: { onprogress: ((e: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = {
+    onprogress: null,
+  }
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  requestHeaders: Record<string, string> = {}
+  sentBody: FormData | null = null
+
+  open(method: string, url: string) {
+    this.method = method
+    this.url = url
+  }
+  setRequestHeader(name: string, value: string) {
+    this.requestHeaders[name] = value
+  }
+  send(body: FormData) {
+    this.sentBody = body
+    MockXHR.instances.push(this)
+  }
+}
+
+test('uploadDocument POSTs multipart form data with the file, doc_kind and product_id fields', async () => {
+  MockXHR.instances = []
+  vi.stubGlobal('XMLHttpRequest', MockXHR as unknown as typeof XMLHttpRequest)
+
+  const file = new File(['hello'], 'label.pdf', { type: 'application/pdf' })
+  const promise = productsApi.uploadDocument({ file, docKind: 'label', productId: 'p1' })
+
+  const xhr = MockXHR.instances[0]
+  expect(xhr.method).toBe('POST')
+  expect(xhr.url).toContain('/documents')
+  expect(xhr.sentBody?.get('doc_kind')).toBe('label')
+  expect(xhr.sentBody?.get('product_id')).toBe('p1')
+  expect(xhr.sentBody?.get('file')).toBe(file)
+
+  xhr.status = 201
+  xhr.responseText = JSON.stringify({ id: 'd1', filename: 'label.pdf', doc_kind: 'label' })
+  xhr.onload?.()
+
+  const doc = await promise
+  expect(doc.id).toBe('d1')
+})
+
+test('uploadDocument surfaces the server rejection detail on a non-2xx response', async () => {
+  MockXHR.instances = []
+  vi.stubGlobal('XMLHttpRequest', MockXHR as unknown as typeof XMLHttpRequest)
+
+  const file = new File(['hello'], 'huge.pdf', { type: 'application/pdf' })
+  const promise = productsApi.uploadDocument({ file, docKind: 'other', productId: 'p1' })
+
+  const xhr = MockXHR.instances[0]
+  xhr.status = 400
+  xhr.statusText = 'Bad Request'
+  xhr.responseText = JSON.stringify({ detail: 'File exceeds the 20MB size limit' })
+  xhr.onload?.()
+
+  await expect(promise).rejects.toMatchObject({ status: 400, message: 'File exceeds the 20MB size limit' })
+})

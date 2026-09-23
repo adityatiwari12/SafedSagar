@@ -455,6 +455,93 @@ export type MessageTree = {
     summaryHeadline: string
     viewSource: string
   }
+  abs: {
+    tabLabel: string
+    disclaimer: string
+    loading: string
+    retry: string
+    stepLabel: string
+    back: string
+    next: string
+    saveAssessment: string
+    saveAndExit: string
+    saving: string
+    cancelEdit: string
+    editCta: string
+    yes: string
+    no: string
+    notSure: string
+    notAnsweredYet: string
+    qIsBiologicalResource: string
+    qResourceDescription: string
+    resourceDescriptionPlaceholder: string
+    qOrigin: string
+    qSourcing: string
+    qInvolvesTk: string
+    qPurpose: string
+    qEntityCategory: string
+    originIndia: string
+    originOutsideIndia: string
+    originUnknown: string
+    sourcingWild: string
+    sourcingCultivated: string
+    sourcingBoth: string
+    sourcingUnknown: string
+    purposeCommercial: string
+    purposeResearchOnly: string
+    purposeUnknown: string
+    entityIndianIndividual: string
+    entityIndianCompany: string
+    entityForeign: string
+    entityUnknown: string
+    statusNotStarted: string
+    statusInProgress: string
+    statusComplete: string
+    frameworkTitle: string
+    noFrameworkYet: string
+    nextStepsTitle: string
+    findEvidence: string
+    findingEvidence: string
+    evidenceHint: string
+    evidenceTitle: string
+    evidenceEmpty: string
+  }
+  documents: {
+    tabLabel: string
+    loading: string
+    retry: string
+    emptyTitle: string
+    emptyBody: string
+    uploadTitle: string
+    fileLabel: string
+    kindLabel: string
+    kindLabelDoc: string
+    kindCertificate: string
+    kindFormulationSheet: string
+    kindCorrespondence: string
+    kindOther: string
+    uploadHintTypes: string
+    sizeWarning: string
+    uploadButton: string
+    uploading: string
+    filenameHeader: string
+    kindHeader: string
+    sizeHeader: string
+    uploadedHeader: string
+    actionsHeader: string
+    download: string
+    downloading: string
+    delete: string
+    deleteConfirm: string
+    deleteConfirmYes: string
+    deleteConfirmNo: string
+    deleting: string
+  }
+  report: {
+    download: string
+    generating: string
+    hint: string
+  }
 }
 
 export type Messages = MessageTree
