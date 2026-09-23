@@ -433,6 +433,7 @@ export const hi: Messages = {
     answeredBy: '{provider} · {model} द्वारा उत्तर दिया गया',
     answeredByFallback:
       'प्राथमिक क्लाउड मॉडल अनुपलब्ध था — इस उत्तर के लिए स्थानीय फॉलबैक मॉडल का उपयोग किया गया।',
+    followUpLabel: 'अनुवर्ती प्रश्न',
   },
   auth: {
     loginTitle: 'लॉगिन',

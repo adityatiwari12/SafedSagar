@@ -412,6 +412,7 @@ export type MessageTree = {
     relatedProvisionsShowLess: string
     answeredBy: string
     answeredByFallback: string
+    followUpLabel: string
   }
   auth: {
     loginTitle: string

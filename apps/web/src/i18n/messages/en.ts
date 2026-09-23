@@ -434,6 +434,7 @@ export const en: Messages = {
     answeredBy: 'Answered by {provider} · {model}',
     answeredByFallback:
       'The primary cloud model was unavailable — this answer used the local fallback model.',
+    followUpLabel: 'Follow-up question',
   },
   auth: {
     loginTitle: 'Login',

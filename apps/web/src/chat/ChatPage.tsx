@@ -1,11 +1,11 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { isRtl } from '../api/languages'
 import { useLanguage } from '../i18n/LanguageContext'
 import { EmptyState, StatusBadge } from '../ui/primitives'
 import { useChatSession } from './useChatSession'
-import { MessageBubble } from './MessageBubble'
+import { MessageBubble, ClarifyingQuestionBubble } from './MessageBubble'
 import { ClarifyingQuestionForm } from './ClarifyingQuestionForm'
 import { AnswerPanel } from './AnswerPanel'
 import { JourneyStepper, deriveJourneyStep } from './JourneyStepper'
@@ -21,6 +21,19 @@ export default function ChatPage() {
   const [draft, setDraft] = useState('')
   const [showGuided, setShowGuided] = useState(false)
   const location = useLocation()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Multi-round intake means a "final" answer and a mid-conversation
+  // follow-up question both land here as ordinary turns - either way, once
+  // the turn is back to idle the composer is exactly what the user should
+  // type into next, so pull focus back to it instead of leaving it wherever
+  // it landed (e.g. dropped by the textarea's own disabled-while-sending
+  // state).
+  useEffect(() => {
+    if (session.status === 'idle') {
+      textareaRef.current?.focus()
+    }
+  }, [session.status])
 
   const examples = useMemo(() => [t('ask.s1'), t('ask.s2'), t('ask.s3')], [t])
 
@@ -238,15 +251,24 @@ export default function ChatPage() {
                     />
                   )}
 
-                  {session.turns.map((turn) => (
-                    <MessageBubble key={turn.id} role={turn.role}>
-                      {turn.role === 'user' && <p>{turn.text}</p>}
-                      {turn.role === 'assistant' && turn.response && (
-                        <AnswerPanel response={turn.response} />
-                      )}
-                      {turn.role === 'assistant' && !turn.response && turn.text && <p>{turn.text}</p>}
-                    </MessageBubble>
-                  ))}
+                  {session.turns.map((turn) => {
+                    const isClarifyingTurn =
+                      turn.role === 'assistant' &&
+                      !turn.response?.answer &&
+                      Boolean(turn.response?.clarifying_questions?.length)
+                    return (
+                      <MessageBubble key={turn.id} role={turn.role}>
+                        {turn.role === 'user' && <p>{turn.text}</p>}
+                        {turn.role === 'assistant' && turn.response && isClarifyingTurn && (
+                          <ClarifyingQuestionBubble question={turn.response.clarifying_questions![0]} />
+                        )}
+                        {turn.role === 'assistant' && turn.response && !isClarifyingTurn && (
+                          <AnswerPanel response={turn.response} />
+                        )}
+                        {turn.role === 'assistant' && !turn.response && turn.text && <p>{turn.text}</p>}
+                      </MessageBubble>
+                    )
+                  })}
 
                   {session.status === 'sending' && <ThinkingIndicator liveStep={session.liveStep} />}
                 </div>
@@ -305,6 +327,7 @@ export default function ChatPage() {
                     </label>
                     <textarea
                       id="question"
+                      ref={textareaRef}
                       className="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus-visible:outline-none"
                       placeholder={t('chat.composerPlaceholder')}
                       value={draft}

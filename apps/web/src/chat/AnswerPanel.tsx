@@ -6,6 +6,13 @@ import { ConfidenceBadge, StatusBadge } from '../ui/primitives'
 
 const RELATED_PROVISIONS_VISIBLE = 5
 
+// Matches the start of chat/router.py's _BEST_EFFORT_NEXT_STEP - the one
+// string it prepends to next_steps when the 5-round clarifying cap (not the
+// model's own judgment) is what ended the intake. Prefix match rather than
+// exact equality so minor wording tweaks on the backend don't silently drop
+// the highlight.
+const BEST_EFFORT_NEXT_STEP_PREFIX = 'This answer uses the best available understanding'
+
 function Section({
   title,
   children,
@@ -130,6 +137,11 @@ export function AnswerPanel({ response }: { response: ChatTurnResponse }) {
   const { t } = useLanguage()
   const [showEnglish, setShowEnglish] = useState(false)
 
+  // ChatPage routes a clarifying-round turn (empty answer + a pending
+  // question) to the lightweight ClarifyingQuestionBubble instead of this
+  // component - there's no classification/citations/confidence to show
+  // yet. This guard is a defensive fallback for any other caller that
+  // passes such a response straight to AnswerPanel.
   if (!response.answer && response.clarifying_questions?.length) return null
 
   const product = response.classification.product_type.replace(/_/g, ' ')
@@ -334,9 +346,21 @@ export function AnswerPanel({ response }: { response: ChatTurnResponse }) {
       {response.next_steps && response.next_steps.length > 0 && (
         <Section title={t('chat.sectionNextSteps')}>
           <ol className="list-decimal space-y-1.5 pl-4 text-sm text-ink">
-            {response.next_steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
+            {response.next_steps.map((step) => {
+              const isBestEffort = step.startsWith(BEST_EFFORT_NEXT_STEP_PREFIX)
+              return (
+                <li
+                  key={step}
+                  className={
+                    isBestEffort
+                      ? '-ml-4 list-none rounded-sm border-l-2 border-amber-400 bg-amber-50 py-1 pl-3.5 font-medium text-amber-900'
+                      : undefined
+                  }
+                >
+                  {step}
+                </li>
+              )
+            })}
           </ol>
         </Section>
       )}

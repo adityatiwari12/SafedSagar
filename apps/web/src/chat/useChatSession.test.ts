@@ -44,7 +44,7 @@ test('sendMessage appends a user turn then an assistant turn on success', async 
   expect(result.current.status).toBe('idle')
 })
 
-test('surfaces clarifying questions without a final answer-only flow', async () => {
+test('a clarifying_questions response becomes a normal turn, not a blocking form', async () => {
   ;(chatApi.sendTurnStreaming as ReturnType<typeof vi.fn>).mockResolvedValue({
     conversationId: 'conv-1',
     clarifying_questions: ['What formulation form (tablet, oil, powder)?'],
@@ -63,9 +63,62 @@ test('surfaces clarifying questions without a final answer-only flow', async () 
     await result.current.sendMessage('vague product question')
   })
 
-  expect(result.current.pendingClarifying).toEqual([
+  // Pushed as an ordinary assistant turn carrying the full response (so the
+  // UI can render the question), not diverted into pendingClarifying.
+  expect(result.current.turns).toHaveLength(2)
+  expect(result.current.turns[1]).toMatchObject({ role: 'assistant' })
+  expect(result.current.turns[1].response?.clarifying_questions).toEqual([
     'What formulation form (tablet, oil, powder)?',
   ])
+  expect(result.current.pendingClarifying).toBeNull()
+  expect(result.current.status).toBe('idle')
+})
+
+test('the next round is a plain sendMessage(text) call, with no answers payload', async () => {
+  ;(chatApi.sendTurnStreaming as ReturnType<typeof vi.fn>)
+    .mockResolvedValueOnce({
+      conversationId: 'conv-1',
+      clarifying_questions: ['What formulation form (tablet, oil, powder)?'],
+      classification: { product_type: 'unknown', ip_type: 'unknown' },
+      jurisdiction: 'india',
+      answer: '',
+      citations: [],
+      confidence: 0.3,
+      confidence_band: 'low',
+      escalate_recommended: false,
+    })
+    .mockResolvedValueOnce({
+      conversationId: 'conv-1',
+      classification: { product_type: 'ayurvedic_formulation', ip_type: 'patent' },
+      jurisdiction: 'india',
+      answer: 'Tablets made from ashwagandha extract are...',
+      citations: [],
+      confidence: 0.7,
+      confidence_band: 'medium',
+      escalate_recommended: false,
+    })
+
+  const { result } = renderHook(() => useChatSession(), { wrapper })
+
+  await act(async () => {
+    await result.current.sendMessage('vague product question')
+  })
+  await act(async () => {
+    await result.current.sendMessage('It is a tablet made from ashwagandha extract')
+  })
+
+  expect(chatApi.sendTurnStreaming).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      text: 'It is a tablet made from ashwagandha extract',
+      conversationId: 'conv-1',
+      answers: undefined,
+    }),
+    expect.any(Function),
+  )
+  expect(result.current.turns).toHaveLength(4)
+  expect(result.current.turns[3]).toMatchObject({ role: 'assistant' })
+  expect(result.current.turns[3].response?.answer).toBe('Tablets made from ashwagandha extract are...')
+  expect(result.current.pendingClarifying).toBeNull()
 })
 
 test('changing jurisdiction re-sends the last user turn with the new jurisdiction', async () => {

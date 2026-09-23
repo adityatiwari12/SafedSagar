@@ -79,24 +79,18 @@ export function useChatSession(initialProduct?: ActiveProduct | null) {
         )
         setConversationId(response.conversationId)
 
-        if (response.clarifying_questions?.length) {
-          setPendingClarifying(response.clarifying_questions)
-          setTurns((prev) => [
-            ...prev,
-            {
-              id: nextTurnId(),
-              role: 'assistant',
-              text: 'A few details will help classify your product accurately.',
-              response,
-            },
-          ])
-        } else {
-          setPendingClarifying(null)
-          setTurns((prev) => [
-            ...prev,
-            { id: nextTurnId(), role: 'assistant', response },
-          ])
-        }
+        // Live turns never enter the old blocking-form path any more: a
+        // clarifying_questions response with an empty answer is just a
+        // normal assistant turn now (rendered as a lightweight follow-up
+        // question - see MessageBubble's ClarifyingQuestionBubble - instead
+        // of the full AnswerPanel treatment), and the next sendMessage(text)
+        // the user types is already exactly the right reply, no special
+        // path needed. Clear any pendingClarifying left over from a loaded
+        // pre-change conversation (see loadConversation below) so its old
+        // fixed-question form doesn't linger once the user is back in a
+        // live exchange.
+        setPendingClarifying(null)
+        setTurns((prev) => [...prev, { id: nextTurnId(), role: 'assistant', response }])
         setStatus('idle')
       } catch (err) {
         const message =
@@ -123,6 +117,12 @@ export function useChatSession(initialProduct?: ActiveProduct | null) {
     [runTurn],
   )
 
+  // Legacy path: only reachable from the old fixed-3-question
+  // ClarifyingQuestionForm, which itself is now only ever shown for a
+  // replayed pre-change conversation (see loadConversation's pendingClarifying
+  // heuristic below). The live backend ignores the `answers` payload this
+  // sends and just reads `text`, but the merged summary text keeps the
+  // reply meaningful if it does get read.
   const answerClarifying = useCallback(
     async (answers: Record<string, string>) => {
       const base = lastUserTextRef.current ?? ''
@@ -189,7 +189,17 @@ export function useChatSession(initialProduct?: ActiveProduct | null) {
 
         setConversationId(id)
         setTurns(loadedTurns)
-        setPendingClarifying(lastAssistant?.response?.clarifying_questions?.length ? lastAssistant.response.clarifying_questions : null)
+        // Pre-change conversations could end on the old fixed-question
+        // clarifying round (always exactly 3 questions, answered via the
+        // blocking ClarifyingQuestionForm). The new multi-round intake asks
+        // one targeted question at a time and expects a plain free-text
+        // reply like any other turn - it's already rendered inline as a
+        // normal assistant turn by loadedTurns above, needing no form.
+        // Question count is the only signal the stored response_json gives
+        // us to tell the two shapes apart, so only re-enter the old
+        // blocking form when there's more than one question.
+        const lastClarifying = lastAssistant?.response?.clarifying_questions
+        setPendingClarifying(lastClarifying && lastClarifying.length > 1 ? lastClarifying : null)
         lastUserTextRef.current = lastUser?.display_text ?? null
         if (isSupportedLanguage(lastUser?.language ?? lastAssistant?.language)) {
           setLanguage((lastUser?.language ?? lastAssistant?.language) as LanguageCode)
