@@ -14,6 +14,7 @@ import { ChatHistorySidebar } from './ChatHistorySidebar'
 import { GuidedIntakeForm } from './GuidedIntakeForm'
 import { AssessmentRail } from './AssessmentRail'
 import { EscalateButton } from './EscalateButton'
+import { useSpeechRecognition } from './useSpeechRecognition'
 
 export default function ChatPage() {
   const session = useChatSession()
@@ -22,6 +23,15 @@ export default function ChatPage() {
   const [showGuided, setShowGuided] = useState(false)
   const location = useLocation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Snapshot of whatever was already typed when the mic was pressed, so
+  // interim speech results replace only the dictated portion instead of
+  // stacking duplicate partials onto themselves on every onresult event.
+  const dictationBaseRef = useRef('')
+  const speech = useSpeechRecognition(session.language, (text, isFinal) => {
+    const base = dictationBaseRef.current
+    setDraft(base ? `${base} ${text}` : text)
+    if (isFinal) dictationBaseRef.current = base ? `${base} ${text}` : text
+  })
 
   // Multi-round intake means a "final" answer and a mid-conversation
   // follow-up question both land here as ordinary turns - either way, once
@@ -256,8 +266,14 @@ export default function ChatPage() {
                       turn.role === 'assistant' &&
                       !turn.response?.answer &&
                       Boolean(turn.response?.clarifying_questions?.length)
+                    const speakText =
+                      turn.role === 'assistant'
+                        ? turn.response?.answer ||
+                          turn.response?.clarifying_questions?.[0] ||
+                          turn.text
+                        : undefined
                     return (
-                      <MessageBubble key={turn.id} role={turn.role}>
+                      <MessageBubble key={turn.id} role={turn.role} speakText={speakText}>
                         {turn.role === 'user' && <p>{turn.text}</p>}
                         {turn.role === 'assistant' && turn.response && isClarifyingTurn && (
                           <ClarifyingQuestionBubble question={turn.response.clarifying_questions![0]} />
@@ -336,6 +352,33 @@ export default function ChatPage() {
                       disabled={session.status === 'sending' || Boolean(session.pendingClarifying)}
                       rows={composerRows}
                     />
+                    {speech.supported && (
+                      <button
+                        type="button"
+                        aria-label={speech.listening ? t('chat.micStop') : t('chat.micStart')}
+                        title={speech.listening ? t('chat.micListening') : t('chat.micStart')}
+                        disabled={session.status === 'sending' || Boolean(session.pendingClarifying)}
+                        onClick={() => {
+                          if (!speech.listening) dictationBaseRef.current = draft
+                          speech.toggle()
+                        }}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center border transition-colors disabled:opacity-50 ${
+                          speech.listening
+                            ? 'animate-pulse border-red-400 bg-red-50 text-red-600'
+                            : 'border-surface-border bg-white text-ink-faint hover:border-saffron hover:text-saffron-deep'
+                        }`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                          <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+                          <path
+                            d="M5 11a7 7 0 0 0 14 0M12 18v3"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       type="submit"
                       aria-label={t('chat.send')}
@@ -354,7 +397,9 @@ export default function ChatPage() {
                       </svg>
                     </button>
                   </div>
-                  <p className="mt-1.5 px-1 text-xs text-ink-faint">{t('chat.composerHint')}</p>
+                  <p className="mt-1.5 px-1 text-xs text-ink-faint">
+                    {speech.error ? t('chat.micError') : t('chat.composerHint')}
+                  </p>
                 </form>
               </div>
             </div>

@@ -1,12 +1,16 @@
 import { ReactNode } from 'react'
 import { useLanguage } from '../i18n/LanguageContext'
+import { SpeakButton } from './SpeakButton'
 
 export function MessageBubble({
   role,
   children,
+  speakText,
 }: {
   role: 'user' | 'assistant'
   children: ReactNode
+  /** Plain text to read aloud via SpeakButton - assistant bubbles only. */
+  speakText?: string
 }) {
   const { t } = useLanguage()
   const isUser = role === 'user'
@@ -24,9 +28,12 @@ export function MessageBubble({
 
   return (
     <div>
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
-        {t('chat.assessmentLabel')}
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+          {t('chat.assessmentLabel')}
+        </p>
+        {speakText && <SpeakButton text={speakText} />}
+      </div>
       {children}
     </div>
   )

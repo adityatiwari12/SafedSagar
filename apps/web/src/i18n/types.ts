@@ -413,6 +413,14 @@ export type MessageTree = {
     answeredBy: string
     answeredByFallback: string
     followUpLabel: string
+    micStart: string
+    micStop: string
+    micListening: string
+    micUnsupported: string
+    micError: string
+    speakStart: string
+    speakStop: string
+    speakUnsupported: string
   }
   auth: {
     loginTitle: string

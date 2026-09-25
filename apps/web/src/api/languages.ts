@@ -53,3 +53,28 @@ export function isRtl(code: LanguageCode): boolean {
 export function isSupportedLanguage(code: string | null | undefined): code is LanguageCode {
   return !!code && BY_CODE.has(code as LanguageCode)
 }
+
+// BCP-47 tags for the Web Speech API (SpeechRecognition/speechSynthesis) -
+// India-region variants, since actual voice/recognizer coverage per tag is
+// entirely up to the browser/OS speech engine, not something this app
+// controls. Feature-detect at the call site (see useSpeechRecognition /
+// useTextToSpeech) rather than trusting this list as a coverage promise.
+const SPEECH_LANG_TAG: Record<LanguageCode, string> = {
+  en: 'en-IN',
+  hi: 'hi-IN',
+  mr: 'mr-IN',
+  bn: 'bn-IN',
+  ta: 'ta-IN',
+  te: 'te-IN',
+  gu: 'gu-IN',
+  kn: 'kn-IN',
+  ml: 'ml-IN',
+  pa: 'pa-IN',
+  or: 'or-IN',
+  as: 'as-IN',
+  ur: 'ur-IN',
+}
+
+export function speechLangTag(code: LanguageCode): string {
+  return SPEECH_LANG_TAG[code] ?? 'en-IN'
+}

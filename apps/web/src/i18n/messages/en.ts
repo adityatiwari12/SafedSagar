@@ -435,6 +435,14 @@ export const en: Messages = {
     answeredByFallback:
       'The primary cloud model was unavailable — this answer used the local fallback model.',
     followUpLabel: 'Follow-up question',
+    micStart: 'Speak your question',
+    micStop: 'Stop listening',
+    micListening: 'Listening…',
+    micUnsupported: 'Voice input is not supported in this browser',
+    micError: 'Could not hear that — try again or type your question',
+    speakStart: 'Read answer aloud',
+    speakStop: 'Stop reading',
+    speakUnsupported: 'Read-aloud is not supported in this browser',
   },
   auth: {
     loginTitle: 'Login',
