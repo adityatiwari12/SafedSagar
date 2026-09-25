@@ -243,9 +243,14 @@ function AskAboutProductButton({ product, className }: { product: Product; class
 function DossierStatusStrip({
   product,
   latestCase,
+  absAssessment,
 }: {
   product: Product
   latestCase: CaseItem | null
+  // product.abs_tk_status is a dead column nothing has ever populated -
+  // the real ABS status lives on its own AbsAssessment row (app/abs/),
+  // already fetched by this page for the ABS tab.
+  absAssessment: AbsAssessment | null
 }) {
   const confidence =
     latestCase?.confidence_level ?? (latestCase?.confidence_score != null ? 'assessed' : null)
@@ -275,7 +280,22 @@ function DossierStatusStrip({
           TK / ABS · AI confidence
         </p>
         <div className="flex flex-wrap gap-1.5">
-          <StatusBadge status="draft" label={statusSummary(product.abs_tk_status)} />
+          <StatusBadge
+            status={
+              absAssessment?.status === 'complete'
+                ? 'resolved'
+                : absAssessment?.status === 'in_progress'
+                  ? 'in_progress'
+                  : 'draft'
+            }
+            label={
+              absAssessment?.status === 'complete'
+                ? 'ABS: complete'
+                : absAssessment?.status === 'in_progress'
+                  ? 'ABS: in progress'
+                  : 'ABS: not started'
+            }
+          />
           <StatusBadge
             status={
               confidence === 'high'
@@ -2135,7 +2155,7 @@ export default function ProductDetailPage() {
               }
             />
 
-            <DossierStatusStrip product={product} latestCase={latestCase} />
+            <DossierStatusStrip product={product} latestCase={latestCase} absAssessment={absAssessment} />
 
             <div
               role="tablist"

@@ -15,7 +15,6 @@ export function AppShell({
   language,
   onLanguageChange,
   showJourneyControls = false,
-  chatLayout = false,
   authLayout = false,
 }: {
   children: ReactNode
@@ -24,7 +23,6 @@ export function AppShell({
   language?: LanguageCode
   onLanguageChange?: (l: LanguageCode) => void
   showJourneyControls?: boolean
-  chatLayout?: boolean
   /** Compact chrome for login/register — less vertical stretch, slim footer. */
   authLayout?: boolean
 }) {
@@ -47,15 +45,8 @@ export function AppShell({
     crumbMap[location.pathname] ??
     (location.pathname.startsWith('/products/') ? t('crumbs.productDetail') : t('crumbs.home'))
 
-  const compactChrome = chatLayout || authLayout
-
   return (
-    <div
-      className={`flex flex-col ${chatLayout ? 'h-dvh overflow-hidden' : 'min-h-screen'} ${
-        authLayout ? 'bg-ivory' : ''
-      }`}
-      lang={ctxLang}
-    >
+    <div className={`flex min-h-screen flex-col ${authLayout ? 'bg-ivory' : ''}`} lang={ctxLang}>
       <a href="#main-content" className="skip-link">
         {t('common.skipToMain')}
       </a>
@@ -71,11 +62,11 @@ export function AppShell({
       <header className="shrink-0 border-b border-saffron/70 bg-white">
         <div
           className={`mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 ${
-            compactChrome ? 'py-2' : 'py-4'
+            authLayout ? 'py-2' : 'py-4'
           }`}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <StateEmblem className={`w-auto shrink-0 ${compactChrome ? 'h-9' : 'h-[4.75rem]'}`} />
+            <StateEmblem className={`w-auto shrink-0 ${authLayout ? 'h-9' : 'h-[4.75rem]'}`} />
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint sm:text-[11px]">
                 {t('common.ministryAyush')} · {t('common.governmentOfIndia')}
@@ -86,14 +77,12 @@ export function AppShell({
               <Link
                 to="/"
                 className={`block font-bold text-navy hover:text-saffron-deep ${
-                  compactChrome ? 'text-base leading-tight' : 'mt-0.5 text-xl sm:text-2xl'
+                  authLayout ? 'text-base leading-tight' : 'mt-0.5 text-xl sm:text-2xl'
                 }`}
               >
                 IP-SAKTI Sahayak
               </Link>
-              {!compactChrome && (
-                <p className="text-sm text-ink-muted">{t('common.portalTagline')}</p>
-              )}
+              {!authLayout && <p className="text-sm text-ink-muted">{t('common.portalTagline')}</p>}
               {authLayout && (
                 <p className="truncate text-[11px] text-ink-muted">{t('common.portalTagline')}</p>
               )}
@@ -129,7 +118,7 @@ export function AppShell({
         </div>
       </header>
 
-      {!chatLayout && !authLayout && (
+      {!authLayout && (
         <nav className="shrink-0 border-b border-surface-border bg-[#f0f4f8]" aria-label="Breadcrumb">
           <div className="mx-auto max-w-6xl px-4 py-2 text-sm text-ink-muted">{crumb}</div>
         </nav>
@@ -138,29 +127,15 @@ export function AppShell({
       <main
         id="main-content"
         className={
-          chatLayout
-            ? 'mx-auto flex w-full min-h-0 flex-1 flex-col px-4 py-4'
-            : authLayout
-              ? 'mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-4 sm:py-5'
-              : 'mx-auto w-full max-w-6xl flex-1 px-4 py-6'
+          authLayout
+            ? 'mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-4 sm:py-5'
+            : 'mx-auto w-full max-w-6xl flex-1 px-4 py-6'
         }
       >
         {children}
       </main>
 
-      {chatLayout ? (
-        <footer className="shrink-0 border-t-4 border-saffron bg-navy text-white">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-1.5 text-xs text-white/70">
-            <span>
-              {t('common.governmentOfIndia')} · {t('common.ministryAyush')}
-            </span>
-            <span>{t('common.copyright')}</span>
-          </div>
-          <div className="border-t border-white/10 px-4 py-1 text-center text-[10px] text-white/60">
-            {t('common.sihStrip')}
-          </div>
-        </footer>
-      ) : authLayout ? (
+      {authLayout ? (
         <footer className="mt-auto shrink-0 border-t border-surface-border bg-white">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-ink-muted">
             <span>

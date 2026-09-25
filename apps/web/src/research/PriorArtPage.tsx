@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { ApiError } from '../api/http'
 import { PriorArtResult, researchApi } from '../api/researchApi'
@@ -17,15 +18,15 @@ function toEvidenceItems(results: PriorArtResult[]) {
 }
 
 export default function PriorArtPage() {
-  const [query, setQuery] = useState('')
+  const [searchParams] = useSearchParams()
+  const [query, setQuery] = useState(searchParams.get('q') ?? '')
   const [jurisdiction, setJurisdiction] = useState<'india' | 'international' | ''>('')
   const [results, setResults] = useState<PriorArtResult[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function runSearch(e: FormEvent) {
-    e.preventDefault()
-    const trimmed = query.trim()
+  async function search(text: string) {
+    const trimmed = text.trim()
     if (trimmed.length < 3) {
       setError('Enter at least 3 characters to search.')
       return
@@ -41,6 +42,19 @@ export default function PriorArtPage() {
     }
   }
 
+  function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    void search(query)
+  }
+
+  // Arriving from the workspace shell's global search (?q=...) runs the
+  // search immediately instead of leaving the user to press Search again.
+  useEffect(() => {
+    const initial = searchParams.get('q')
+    if (initial && initial.trim().length >= 3) void search(initial)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <AppWorkspaceShell>
       <div className="space-y-5">
@@ -49,7 +63,7 @@ export default function PriorArtPage() {
           description="Search the ingested legal/case-law corpus for related statutes, rules, treaties and judgments. This searches this corpus only — not a live global patent or publication database."
         />
 
-        <form onSubmit={runSearch} className="flex flex-wrap items-end gap-3 border border-surface-border bg-white p-4">
+        <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3 border border-surface-border bg-white p-4">
           <div className="min-w-[16rem] flex-1">
             <label className="gov-label" htmlFor="prior-art-query">
               Search terms

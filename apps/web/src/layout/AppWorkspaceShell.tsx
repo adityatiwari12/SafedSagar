@@ -1,5 +1,5 @@
-import { Link, useLocation } from 'react-router-dom'
-import { ReactNode, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { FormEvent, ReactNode, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { LanguageCode } from '../api/languages'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -7,7 +7,42 @@ import { GovTopBar } from './GovTopBar'
 import { StateEmblem } from './StateEmblem'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { JurisdictionToggle } from './JurisdictionToggle'
+import { NotificationBell } from './NotificationBell'
 import { groupNav, navForRole } from './navConfig'
+
+/** Real, not decorative: routes into the corpus-grounded Prior Art search
+ * (app/research/router.py) - the one actual cross-content search endpoint
+ * the backend has. Scoped to the 'user' role (entrepreneur + researcher
+ * personas both hold RESEARCH_SEARCH_PRIOR_ART); other roles have no
+ * equivalent search backend yet, so the box doesn't render for them
+ * rather than sitting there disabled forever with a "coming next" tooltip. */
+function WorkspaceSearch() {
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = q.trim()
+    if (trimmed.length < 3) return
+    navigate(`/prior-art?q=${encodeURIComponent(trimmed)}`)
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="hidden md:block">
+      <label htmlFor="workspace-search" className="sr-only">
+        Search the corpus
+      </label>
+      <input
+        id="workspace-search"
+        className="gov-input !w-48 !py-1.5 !text-sm lg:!w-64"
+        placeholder="Search prior art…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        title="Corpus-grounded prior-art search"
+      />
+    </form>
+  )
+}
 
 /**
  * Authenticated workspace chrome: GoI bar + brand header + role sidebar.
@@ -91,18 +126,7 @@ export function AppWorkspaceShell({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="hidden md:block">
-              <label htmlFor="workspace-search" className="sr-only">
-                Search
-              </label>
-              <input
-                id="workspace-search"
-                className="gov-input !w-48 !py-1.5 !text-sm lg:!w-64"
-                placeholder="Search workspace…"
-                disabled
-                title="Global search — coming next"
-              />
-            </div>
+            {user?.role === 'user' && <WorkspaceSearch />}
             <LanguageSwitcher
               value={language}
               onChange={onLanguageChange}
@@ -111,6 +135,7 @@ export function AppWorkspaceShell({
             {showJourneyControls && jurisdiction && onJurisdictionChange && (
               <JurisdictionToggle value={jurisdiction} onChange={onJurisdictionChange} />
             )}
+            {user && <NotificationBell role={user.role} />}
             {user && (
               <div className="flex items-center gap-2 border-l border-surface-border pl-3 text-sm">
                 <div className="hidden text-right sm:block">
