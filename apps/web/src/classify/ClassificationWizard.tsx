@@ -281,7 +281,7 @@ export default function ClassificationWizard() {
 
               <p className="text-sm text-ink-muted">{result.rationale}</p>
 
-              <div className="rounded-sm border-l-4 border-indiaGreen bg-surface-muted/60 p-3">
+              <div className="border border-surface-border border-t-2 border-t-indiaGreen bg-surface-muted/60 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
                   What this means
                 </p>

@@ -25,7 +25,7 @@ export function EscalateButton({
 
   return (
     <div
-      className={`gov-panel p-4 ${emphasized ? 'border-l-4 border-red-700 bg-red-50' : ''}`}
+      className={`gov-panel p-4 ${emphasized ? 'border-t-2 border-t-red-700 bg-red-50' : ''}`}
     >
       <h3 className="text-base font-bold text-navy">Need a human IP facilitator?</h3>
       <p className="mt-1 text-sm text-ink-muted">

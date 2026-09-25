@@ -23,7 +23,7 @@ export function ClarifyingQuestionForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="gov-panel border-l-4 border-saffron p-4"
+      className="gov-panel border-t-2 border-t-saffron bg-orange-50/40 p-4"
       aria-labelledby="clarify-heading"
     >
       <h3 id="clarify-heading" className="text-base font-bold text-navy">
