@@ -73,10 +73,18 @@ vector-store metadata) so staleness/re-ingestion can be queried directly.
    "signed, not yet binding," not as active law.
 3. **Section 14 accuracy targets (≥90% answer accuracy, ≥95% citation correctness) are
    evaluation goals, not MVP entry criteria.** Don't burn build time chasing them early.
-4. **No State Emblem, no claim of official AYUSH branding.** Use a GIGW-style layout
-   (accessible, WCAG 2.1 AA-aligned, breadcrumb nav, visible "last verified" dates,
-   language switcher in header) but keep a persistent "SIH 2026 Prototype — Not an
-   official Government of India website" strip in header/footer.
+4. **State Emblem use, amended 2026-09-24.** The original rule here was "No State Emblem" —
+   the app has in fact rendered a real State Emblem of India SVG (`apps/web/public/emblem-of-india.svg`,
+   Wikimedia Commons/public domain) in every header/footer since early in the project, and
+   the project owner has confirmed this is deliberate, not an oversight to fix. The real
+   safeguard is the disclaimer, not emblem absence: **every page that renders the emblem
+   must also render the persistent "SIH 2026 Prototype — Not an official Government of
+   India website" strip** (`common.sihStrip`, in header or footer). Before adding the
+   emblem to a new shell/page, add the strip there too in the same change — check
+   `AppShell.tsx`/`AppWorkspaceShell.tsx`/`PortalChrome.tsx` for the pattern. Still use a
+   GIGW-style layout (accessible, WCAG 2.1 AA-aligned, breadcrumb nav, visible "last
+   verified" dates, language switcher in header) and make no claim of official AYUSH
+   branding beyond the emblem + disclaimer combination itself.
 5. **Bhashini requires portal registration before you can call its API** — start that
    process on day one regardless of when multilingual work is scheduled.
 6. Scrape ipindia.gov.in / nbaindia.org / fssai.gov.in search UIs respectfully and
@@ -133,9 +141,18 @@ Core User Journey (Section 7) — confirm/edit with your team before relying on 
 
 ## Explicitly out of scope for MVP
 
-Agentic multi-source orchestration (Phase 4), paid-source connectors (Phase 4), voice
-interface (Phase 5), automatic IP/regulatory filing. These are staged *after* the MVP in the
-source PRD itself — don't parallelize them in.
+Agentic multi-source orchestration (Phase 4), paid-source connectors (Phase 4), automatic
+IP/regulatory filing. These are staged *after* the MVP in the source PRD itself — don't
+parallelize them in.
+
+**Voice interface (PRD Phase 5) is pulled forward, deliberately, browser-native only** —
+mic input via the Web Speech API `SpeechRecognition` and spoken answers via
+`speechSynthesis`, both client-side in `apps/web`. This is NOT Bhashini: caveat #5's
+portal-registration gate on Bhashini's API still stands, so real Bhashini
+STT/TTS stays out of scope until that registration is done. Browser voice support is
+inconsistent across browsers/languages (Hindi coverage varies), so treat it as a
+best-effort input/output convenience layered on the existing text chat, not a guaranteed
+parity channel — text chat remains the source of truth path.
 
 **Knowledge graph (PRD Phase 3) is now in scope** — the retrieval MVP it was staged behind
 is built. Lives in `app/kg/` (Postgres `kg_nodes`/`kg_edges`, no separate graph service).
@@ -146,8 +163,17 @@ place in this system to invent law, so don't relax this for coverage.
 
 ## Known corpus gaps
 
-The problem statement requires these but they are **not ingested**, so the assistant can't
-answer from them and the graph has no nodes for them — add sources before promising
-coverage: Drugs and Magic Remedies (Objectionable Advertisements) Act, PPV&FR Act (plant
-varieties), Hague Agreement (designs), Ayurvedic Pharmacopoeia of India, export-market
-herbal regimes.
+All five gaps originally listed here are now closed (see `ingestion/source_registry.yaml`
+Waves D/E/F): Drugs and Magic Remedies (Objectionable Advertisements) Act, PPV&FR Act +
+Rules (plant varieties), Hague Agreement Geneva Act (designs), Ayurvedic Pharmacopoeia of
+India, and export-market herbal regimes (EU Directive 2004/24/EC on traditional herbal
+medicinal products, US DSHEA 1994). 68 documents / 66+ distinct doc_ids are registered as
+of this writing — check `source_registry.yaml`'s row count directly before citing a
+specific number, since it keeps growing.
+
+If a new gap surfaces (a jurisdiction, doc type, or regime the corpus doesn't cover yet),
+add it here with the same rigor Waves D-F used: verify the fetched URL actually serves the
+expected document (check opening text against the expected title, not just a 200 status —
+gov sites in this corpus have repeatedly served SPA shells or WAF challenge pages with a
+200/202 and no real content), and prefer a Wayback Machine capture over skipping a source
+outright when the live site blocks direct fetch.

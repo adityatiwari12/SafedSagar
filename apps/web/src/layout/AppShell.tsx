@@ -156,6 +156,9 @@ export function AppShell({
             </span>
             <span>{t('common.copyright')}</span>
           </div>
+          <div className="border-t border-white/10 px-4 py-1 text-center text-[10px] text-white/60">
+            {t('common.sihStrip')}
+          </div>
         </footer>
       ) : authLayout ? (
         <footer className="mt-auto shrink-0 border-t border-surface-border bg-white">
@@ -164,6 +167,9 @@ export function AppShell({
               {t('common.governmentOfIndia')} · {t('common.ministryAyush')}
             </span>
             <span>For demonstration purposes</span>
+          </div>
+          <div className="border-t border-surface-border px-4 py-1 text-center text-[10px] text-ink-faint">
+            {t('common.sihStrip')}
           </div>
         </footer>
       ) : (
@@ -195,6 +201,9 @@ export function AppShell({
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-white/70">
               <span>{t('common.copyright')}</span>
               <span>{t('common.lastUpdated')}</span>
+            </div>
+            <div className="border-t border-white/10 px-4 py-1 text-center text-[10px] text-white/60">
+              {t('common.sihStrip')}
             </div>
           </div>
           <div className="tricolor-bar" aria-hidden="true">

@@ -250,6 +250,9 @@ export function PortalChrome({ children }: { children: ReactNode }) {
             <p className="mt-4 text-xs text-gold-soft">{t('footer.notOfficial')}</p>
           </div>
         </div>
+        <div className="border-t border-white/10 px-4 py-1 text-center text-[10px] text-white/60">
+          {t('common.sihStrip')}
+        </div>
         <div className="tricolor-bar" aria-hidden="true">
           <span />
           <span />

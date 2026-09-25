@@ -198,6 +198,13 @@ export function AppWorkspaceShell({
           {children}
         </main>
       </div>
+
+      {/* CLAUDE.md caveat #4: non-negotiable persistent disclaimer - this
+          shell has no other footer, so it's the only place this renders
+          for every signed-in workspace page (chat, products, cases, admin). */}
+      <footer className="shrink-0 border-t border-surface-border bg-white px-4 py-1 text-center text-[10px] text-ink-faint">
+        {t('common.sihStrip')}
+      </footer>
     </div>
   )
 }
