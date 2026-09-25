@@ -4,6 +4,7 @@ import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { ApiError } from '../api/http'
 import { CaseItem } from '../api/casesApi'
 import { StatusBadge as CaseStatusBadge, RiskBadge } from '../cases/caseBadges'
+import { ipTypeInfo } from '../research/ipTypeInfo'
 import { useLanguage } from '../i18n/LanguageContext'
 import type { TranslateFn } from '../i18n/types'
 import {
@@ -57,15 +58,35 @@ type TabId =
   | 'documents'
   | 'assessments'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'formulation', label: 'Formulation' },
-  { id: 'classification', label: 'Classification' },
-  { id: 'pathways', label: 'Pathways' },
-  { id: 'compliance', label: 'Compliance' },
-  { id: 'abs', label: 'ABS' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'assessments', label: 'Assessments' },
+// Grouped conceptually (brief: "group tabs conceptually where appropriate,
+// do not display excessive horizontal tabs") rather than one flat row of
+// 8 equally-weighted tabs - a group boundary renders as a divider, not a
+// second navigation level, so existing tab-content components/tests below
+// are untouched.
+const TAB_GROUPS: { group: string; tabs: { id: TabId; label: string }[] }[] = [
+  { group: 'Overview', tabs: [{ id: 'overview', label: 'Overview' }] },
+  {
+    group: 'Formulation',
+    tabs: [
+      { id: 'formulation', label: 'Formulation' },
+      { id: 'classification', label: 'Classification' },
+    ],
+  },
+  {
+    group: 'IP & Regulatory',
+    tabs: [
+      { id: 'pathways', label: 'IP Strategy' },
+      { id: 'compliance', label: 'Regulatory' },
+    ],
+  },
+  { group: 'TK & ABS', tabs: [{ id: 'abs', label: 'TK & ABS' }] },
+  {
+    group: 'Records',
+    tabs: [
+      { id: 'documents', label: 'Documents' },
+      { id: 'assessments', label: 'Assessments' },
+    ],
+  },
 ]
 
 /** Creates a temporary object URL and clicks a throwaway <a download> to
@@ -94,8 +115,6 @@ const COMPLIANCE_STATUS_TONE: Record<ComplianceStatus, string> = {
 function complianceStatusLabel(statusValue: ComplianceStatus): string {
   return statusValue.replace(/_/g, ' ')
 }
-
-const PLANNED_MODULES = ['IP Strategy', 'Prior Art', 'Regulatory detail', 'TK', 'Activity'] as const
 
 function statusSummary(status: Record<string, unknown> | null | undefined): string {
   if (!status || Object.keys(status).length === 0) return 'Not assessed'
@@ -539,57 +558,64 @@ function ClassificationTab({ product }: { product: Product }) {
   )
 }
 
-function StatusSection({
-  title,
-  status,
-}: {
-  title: string
-  status: Record<string, unknown> | null | undefined
-}) {
-  const entries = status ? Object.entries(status) : []
-  return (
-    <div>
-      <h3 className="text-sm font-bold text-navy">{title}</h3>
-      {entries.length === 0 ? (
-        <p className="mt-2 text-sm text-ink-muted">Not yet assessed.</p>
-      ) : (
-        <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-          {entries.map(([key, value]) => (
-            <div key={key}>
-              <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
-                {key.replace(/_/g, ' ')}
-              </dt>
-              <dd className="mt-0.5 text-sm text-ink">{String(value)}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
-  )
-}
+function PathwaysTab({ latestCase }: { latestCase: CaseItem | null }) {
+  const ipTypes = latestCase?.ip_types ?? []
 
-function PathwaysTab({ product }: { product: Product }) {
   return (
     <div className="space-y-6">
-      <StatusSection title="IP status" status={product.ip_status} />
-      <StatusSection title="Regulatory status" status={product.regulatory_status} />
-      <StatusSection title="ABS / TK status" status={product.abs_tk_status} />
-      <div className="border border-dashed border-surface-border bg-ivory/50 px-4 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
-          Planned pathway modules
+      <div>
+        <h3 className="text-sm font-bold text-navy">Potentially applicable IP regimes</h3>
+        <p className="mt-1 text-xs text-ink-muted">
+          Identified from Research Sahayak assessments already run against this project - not a
+          new analysis, and never a filing recommendation.
         </p>
-        <p className="mt-1 text-sm text-ink-muted">
-          Deeper IP Strategy, Prior Art, Regulatory, TK and Activity views are staged for later
-          phases. Current fields above remain the source of truth for MVP. See the ABS and
-          Documents tabs for the modules now live.
-        </p>
-        <ul className="mt-2 flex flex-wrap gap-2">
-          {PLANNED_MODULES.map((m) => (
-            <li key={m}>
-              <StatusBadge status="draft" label={m} />
-            </li>
-          ))}
+        {ipTypes.length === 0 ? (
+          <p className="mt-3 text-sm text-ink-faint">
+            No IP regime identified yet — ask Research Sahayak about this project to get started.
+          </p>
+        ) : (
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {ipTypes.map((ipType) => {
+              const info = ipTypeInfo(ipType)
+              return (
+                <li key={ipType} className="border-l-2 border-saffron bg-ivory/50 p-3">
+                  <p className="text-sm font-bold text-ink">{info.label}</p>
+                  {info.protects && (
+                    <p className="mt-1 text-xs leading-relaxed text-ink-muted">{info.protects}</p>
+                  )}
+                  <p className="mt-2 text-[11px] italic text-ink-faint">Potentially applicable.</p>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="border-t border-surface-border pt-4">
+        <h3 className="mb-2 text-sm font-bold text-navy">Related modules</h3>
+        <ul className="flex flex-wrap gap-2">
+          <li>
+            <Link
+              to={`/ip-strategy`}
+              className="gov-btn-secondary !py-1.5 text-xs"
+            >
+              IP Opportunities (all projects)
+            </Link>
+          </li>
+          <li>
+            <Link to={`/prior-art`} className="gov-btn-secondary !py-1.5 text-xs">
+              Prior Art search
+            </Link>
+          </li>
+          <li>
+            <Link to={`/tk-abs`} className="gov-btn-secondary !py-1.5 text-xs">
+              TK &amp; ABS Explorer
+            </Link>
+          </li>
         </ul>
+        <p className="mt-2 text-[11px] text-ink-faint">
+          Regulatory detail lives in the Compliance tab; Activity history is not yet built.
+        </p>
       </div>
     </div>
   )
@@ -2160,24 +2186,36 @@ export default function ProductDetailPage() {
             <div
               role="tablist"
               aria-label="Product dossier sections"
-              className="flex flex-wrap gap-1 border-b border-line"
+              className="flex flex-wrap items-stretch gap-x-1 border-b border-line"
             >
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === t.id}
-                  aria-current={tab === t.id ? 'true' : undefined}
-                  onClick={() => setTab(t.id)}
-                  className={`border-b-2 px-3 py-2 text-sm font-semibold ${
-                    tab === t.id
-                      ? 'border-saffron text-navy'
-                      : 'border-transparent text-ink-muted hover:text-ink'
-                  }`}
-                >
-                  {t.label}
-                </button>
+              {TAB_GROUPS.map((g, gi) => (
+                <div key={g.group} className="flex items-stretch">
+                  {gi > 0 && <span aria-hidden="true" className="mx-1.5 my-2 w-px bg-line" />}
+                  <div className="flex flex-col">
+                    <span className="px-3 pt-1 text-[9px] font-bold uppercase tracking-[0.1em] text-ink-faint">
+                      {g.group}
+                    </span>
+                    <div className="flex">
+                      {g.tabs.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={tab === t.id}
+                          aria-current={tab === t.id ? 'true' : undefined}
+                          onClick={() => setTab(t.id)}
+                          className={`border-b-2 px-3 py-1.5 text-sm font-semibold ${
+                            tab === t.id
+                              ? 'border-saffron text-navy'
+                              : 'border-transparent text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
 
@@ -2194,7 +2232,7 @@ export default function ProductDetailPage() {
               )}
               {tab === 'formulation' && <FormulationTab product={product} />}
               {tab === 'classification' && <ClassificationTab product={product} />}
-              {tab === 'pathways' && <PathwaysTab product={product} />}
+              {tab === 'pathways' && <PathwaysTab latestCase={latestCase} />}
               {tab === 'compliance' && (
                 <ComplianceTab
                   product={product}
