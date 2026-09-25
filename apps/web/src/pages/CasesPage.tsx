@@ -157,10 +157,62 @@ function CaseCard({ item, onChanged }: { item: CaseItem; onChanged: () => void }
   )
 }
 
+const RISK_WEIGHT: Record<string, number> = { high: 0, medium: 1, low: 2 }
+const CONFIDENCE_WEIGHT: Record<string, number> = { low: 0, medium: 1, high: 2, insufficient: -1 }
+
+/** "What needs attention" ordering: highest risk first, then lowest
+ * confidence, then oldest first within a tie - so the case most likely to
+ * need a human's judgment call is always at the top, not just whatever
+ * order the API happened to return. */
+function byPriority(a: CaseItem, b: CaseItem): number {
+  const riskDiff = (RISK_WEIGHT[a.risk_level] ?? 1) - (RISK_WEIGHT[b.risk_level] ?? 1)
+  if (riskDiff !== 0) return riskDiff
+  const confDiff =
+    (CONFIDENCE_WEIGHT[a.confidence_level ?? 'insufficient'] ?? -1) -
+    (CONFIDENCE_WEIGHT[b.confidence_level ?? 'insufficient'] ?? -1)
+  if (confDiff !== 0) return confDiff
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+}
+
+function AttentionSummary({ cases }: { cases: CaseItem[] }) {
+  const open = cases.filter((c) => c.status !== 'closed').length
+  const lowConfidence = cases.filter(
+    (c) => c.status !== 'closed' && c.confidence_level === 'low',
+  ).length
+  const highRisk = cases.filter((c) => c.status !== 'closed' && c.risk_level === 'high').length
+  const unassigned = cases.filter(
+    (c) => c.status === 'open' && !c.assigned_facilitator_email,
+  ).length
+
+  if (cases.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-3 border border-surface-border bg-white p-3">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint">Awaiting you</p>
+        <p className="text-lg font-extrabold text-navy">{open}</p>
+      </div>
+      <div className="border-l border-surface-border pl-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint">Low confidence</p>
+        <p className="text-lg font-extrabold text-navy">{lowConfidence}</p>
+      </div>
+      <div className="border-l border-surface-border pl-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint">High risk</p>
+        <p className="text-lg font-extrabold text-navy">{highRisk}</p>
+      </div>
+      <div className="border-l border-surface-border pl-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint">Unclaimed</p>
+        <p className="text-lg font-extrabold text-navy">{unassigned}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function CasesPage() {
   const { user } = useAuth()
   const [cases, setCases] = useState<CaseItem[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -188,10 +240,16 @@ export default function CasesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
+  const visible = [...cases]
+    .filter((c) => !lowConfidenceOnly || c.confidence_level === 'low')
+    .sort(byPriority)
+
   return (
     <AppWorkspaceShell>
       <PageHeader title={title} description={description} />
       <div className="space-y-5">
+        <AttentionSummary cases={cases} />
+
         <div className="flex flex-wrap items-center gap-2">
           {['', 'open', 'in_progress', 'closed'].map((s) => (
             <button
@@ -203,6 +261,13 @@ export default function CasesPage() {
               {s === '' ? 'All' : s.replace('_', ' ')}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setLowConfidenceOnly((v) => !v)}
+            className={`gov-btn-secondary !py-1 text-xs ${lowConfidenceOnly ? 'border-primary bg-primary/10' : ''}`}
+          >
+            Low confidence only
+          </button>
           <button type="button" onClick={() => void load()} className="gov-btn-secondary !py-1 text-xs">
             Refresh
           </button>
@@ -211,15 +276,19 @@ export default function CasesPage() {
         {error && <ErrorState message={error} />}
         {loading && <LoadingState label="Loading cases…" />}
 
-        {!loading && cases.length === 0 && (
+        {!loading && visible.length === 0 && (
           <EmptyState
             title="No cases in this view"
-            description="Ask a low-confidence or out-of-scope question as a User to see an escalation appear here."
+            description={
+              lowConfidenceOnly
+                ? 'No low-confidence cases in the current filter.'
+                : 'Ask a low-confidence or out-of-scope question as a User to see an escalation appear here.'
+            }
           />
         )}
 
         <div className="space-y-4">
-          {cases.map((c) => (
+          {visible.map((c) => (
             <CaseCard key={c.id} item={c} onChanged={() => void load()} />
           ))}
         </div>
