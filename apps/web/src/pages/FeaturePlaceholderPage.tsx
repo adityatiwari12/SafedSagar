@@ -5,21 +5,9 @@ import { navForRole } from '../layout/navConfig'
 import { useAuth } from '../auth/AuthContext'
 
 const COPY: Record<string, { title: string; body: string }> = {
-  '/ip-strategy': {
-    title: 'IP Strategy',
-    body: 'Visual IP asset mapping (patent, trademark, design, GI, trade secret) will live here. Potentially applicable routes — not filing instructions.',
-  },
-  '/prior-art': {
-    title: 'Prior Art',
-    body: 'Search and landscape views for publications, disclosures and registry pointers will appear here. Results will always cite source and relevance.',
-  },
   '/regulatory': {
     title: 'Regulatory',
     body: 'AYUSH, FSSAI and related pathway guidance structured by product category — separate from IP filing strategy.',
-  },
-  '/tk-abs': {
-    title: 'TK & ABS',
-    body: 'Traditional knowledge awareness and biodiversity / ABS indicators. TKDL remains awareness-only (not live retrieval).',
   },
   '/documents': {
     title: 'Documents',

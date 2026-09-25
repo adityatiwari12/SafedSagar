@@ -101,6 +101,7 @@ async def _to_case_out(db: AsyncSession, case: Case) -> CaseOut:
         answer=answer,
         reason=None,
         product_classification=case.product_classification,
+        ip_types=case.ip_types,
         jurisdiction=case.jurisdiction,
         confidence_score=case.confidence_score,
         confidence_level=case.confidence_level,

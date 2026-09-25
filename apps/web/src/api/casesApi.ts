@@ -14,6 +14,9 @@ export interface CaseItem {
   answer: string
   reason: string | null
   product_classification: string | null
+  // subset of app.graph.state.IP_TYPES (patent/trademark/design/...) - the
+  // IP regimes this case's question touched.
+  ip_types: string[] | null
   jurisdiction: string | null
   confidence_score: number | null
   confidence_level: string | null

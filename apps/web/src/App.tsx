@@ -14,12 +14,12 @@ import ClassificationWizard from './classify/ClassificationWizard'
 import LandingPage from './landing/LandingPage'
 import ProductsListPage from './products/ProductsListPage'
 import ProductDetailPage from './products/ProductDetailPage'
+import IpOpportunitiesPage from './research/IpOpportunitiesPage'
+import TkAbsExplorerPage from './research/TkAbsExplorerPage'
+import PriorArtPage from './research/PriorArtPage'
 
 const PLANNED = [
-  '/ip-strategy',
-  '/prior-art',
   '/regulatory',
-  '/tk-abs',
   '/documents',
   '/assessments',
   '/expert-assistance',
@@ -90,6 +90,30 @@ export default function App() {
             element={
               <RequireAuth allow={['user']}>
                 <ProductDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/ip-strategy"
+            element={
+              <RequireAuth allow={['user']}>
+                <IpOpportunitiesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/tk-abs"
+            element={
+              <RequireAuth allow={['user']}>
+                <TkAbsExplorerPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/prior-art"
+            element={
+              <RequireAuth allow={['user']}>
+                <PriorArtPage />
               </RequireAuth>
             }
           />

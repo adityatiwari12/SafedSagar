@@ -15,6 +15,10 @@ class CaseOut(BaseModel):
     answer: str
     reason: str | None
     product_classification: str | None
+    # subset of app.graph.state.IP_TYPES - was stored on Case but never
+    # serialized until the researcher-persona IP Opportunities page needed
+    # per-case IP-regime breakdown, not just the product category.
+    ip_types: list[str] | None = None
     jurisdiction: str | None
     confidence_score: float | None
     confidence_level: str | None
