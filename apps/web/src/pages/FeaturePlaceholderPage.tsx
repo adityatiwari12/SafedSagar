@@ -37,10 +37,6 @@ const COPY: Record<string, { title: string; body: string }> = {
     title: 'Products (Admin)',
     body: 'Cross-tenant product oversight for platform administrators.',
   },
-  '/knowledge-base': {
-    title: 'Knowledge Base',
-    body: 'Source registry with authority, jurisdiction, version, effective dates and supersession history.',
-  },
   '/ai-quality': {
     title: 'AI Quality',
     body: 'Citation correctness, confidence distribution and escalation rates.',
@@ -56,10 +52,6 @@ const COPY: Record<string, { title: string; body: string }> = {
   '/jurisdictions': {
     title: 'Jurisdictions',
     body: 'India vs International routing configuration and corpus filters.',
-  },
-  '/audit-logs': {
-    title: 'Audit Logs',
-    body: 'Immutable access and mutation history for compliance review.',
   },
   '/security': {
     title: 'Security',

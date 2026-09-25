@@ -18,6 +18,8 @@ import IpOpportunitiesPage from './research/IpOpportunitiesPage'
 import TkAbsExplorerPage from './research/TkAbsExplorerPage'
 import PriorArtPage from './research/PriorArtPage'
 import DocumentsLibraryPage from './research/DocumentsLibraryPage'
+import KnowledgeBasePage from './pages/KnowledgeBasePage'
+import AuditLogsPage from './pages/AuditLogsPage'
 
 const PLANNED = [
   '/regulatory',
@@ -28,12 +30,10 @@ const PLANNED = [
   '/sources',
   '/organisations',
   '/products-admin',
-  '/knowledge-base',
   '/ai-quality',
   '/analytics',
   '/languages',
   '/jurisdictions',
-  '/audit-logs',
   '/security',
 ] as const
 
@@ -128,7 +128,7 @@ export default function App() {
           <Route
             path="/cases"
             element={
-              <RequireAuth allow={['facilitator', 'regulatory_expert', 'admin']}>
+              <RequireAuth allow={['user', 'facilitator', 'regulatory_expert', 'admin']}>
                 <CasesPage />
               </RequireAuth>
             }
@@ -138,6 +138,22 @@ export default function App() {
             element={
               <RequireAuth allow={['admin']}>
                 <AdminPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/knowledge-base"
+            element={
+              <RequireAuth allow={['admin']}>
+                <KnowledgeBasePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <RequireAuth allow={['admin']}>
+                <AuditLogsPage />
               </RequireAuth>
             }
           />

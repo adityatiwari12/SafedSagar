@@ -52,3 +52,29 @@ class RoleAssignmentCreate(BaseModel):
     # they themselves have users.manage over (enforced in the route, not
     # just by this schema accepting the field).
     organization_id: uuid.UUID | None = None
+
+
+class SourceSummary(BaseModel):
+    """One row per doc_id (not per chunk) - the corpus as the knowledge-
+    base owner actually thinks about it: one document, versioned and
+    dated, not N retrieval fragments."""
+
+    doc_id: str
+    title: str
+    authority: str
+    jurisdiction: str
+    doc_type: str
+    version: str | None
+    effective_date: str | None
+    last_verified_date: str | None
+    source_url: str | None
+    chunk_count: int
+
+
+class AuditLogEntryOut(BaseModel):
+    id: uuid.UUID
+    actor_user_id: uuid.UUID | None
+    actor_email: str | None
+    action: str
+    detail: dict | None
+    created_at: datetime

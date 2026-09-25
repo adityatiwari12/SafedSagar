@@ -106,6 +106,7 @@ class Permission:
     REVIEW_REJECT = "review.reject"
     REVIEW_ESCALATE = "review.escalate"
 
+    SOURCE_VIEW = "source.view"
     SOURCE_CREATE = "source.create"
     SOURCE_EDIT = "source.edit"
     SOURCE_VERIFY = "source.verify"
@@ -165,6 +166,7 @@ PERMISSION_CATALOG: list[tuple[str, str, str, str]] = [
     (Permission.REVIEW_MODIFY, "review", "modify", "Modify/replace a case's answer."),
     (Permission.REVIEW_REJECT, "review", "reject", "Reject a case's AI answer."),
     (Permission.REVIEW_ESCALATE, "review", "escalate", "Escalate a case to a higher review tier."),
+    (Permission.SOURCE_VIEW, "source", "view", "View knowledge-base source metadata (browse the corpus)."),
     (Permission.SOURCE_CREATE, "source", "create", "Add a new knowledge-base source."),
     (Permission.SOURCE_EDIT, "source", "edit", "Edit a knowledge-base source's metadata/content."),
     (Permission.SOURCE_VERIFY, "source", "verify", "Mark a source's last-verified date/status."),
@@ -273,6 +275,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.USERS_MANAGE,
         Permission.AUDIT_VIEW,
         Permission.ANALYTICS_ORGANIZATION,
+        # Read-only oversight of the RAG corpus - mutate permissions
+        # (SOURCE_CREATE/EDIT/VERIFY/DEPRECATE/PUBLISH) stay KB_MANAGER-only.
+        Permission.SOURCE_VIEW,
     },
     RoleName.MINISTRY_ADMIN: _AI_PERMISSIONS
     | {
@@ -287,9 +292,11 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.AUDIT_VIEW,
         Permission.ANALYTICS_ORGANIZATION,
         Permission.ANALYTICS_NATIONAL,
+        Permission.SOURCE_VIEW,
     },
     RoleName.KB_MANAGER: _AI_PERMISSIONS
     | {
+        Permission.SOURCE_VIEW,
         Permission.SOURCE_CREATE,
         Permission.SOURCE_EDIT,
         Permission.SOURCE_VERIFY,

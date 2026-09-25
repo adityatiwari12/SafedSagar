@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { UserRole } from '../api/authApi'
+import { UserPersona, UserRole } from '../api/authApi'
 import { casesApi } from '../api/casesApi'
 import { productsApi } from '../api/productsApi'
 import { adminApi } from '../api/adminApi'
@@ -56,9 +56,17 @@ function CaseQueueGlance() {
   )
 }
 
-/** User / Researcher persona: their own product/research-project count
- * and how many are missing basic classification - reuses productsApi.list(). */
-function ProductsGlance() {
+/** User/Researcher/Cultivator persona: their own product (framed per
+ * persona - "Research Projects", "Biological Resource" entries, or plain
+ * "Products") count and how many are missing basic classification -
+ * reuses productsApi.list(). */
+function ProductsGlance({ persona }: { persona: UserPersona | null }) {
+  const label =
+    persona === 'practitioner_researcher'
+      ? 'Research projects'
+      : persona === 'cultivator'
+        ? 'Biological resources'
+        : 'Products'
   const [counts, setCounts] = useState<{ total: number; unclassified: number } | null>(null)
 
   useEffect(() => {
@@ -83,7 +91,7 @@ function ProductsGlance() {
   return (
     <Panel title="At a glance">
       <div className="grid grid-cols-2 gap-4">
-        <Stat label="Research projects" value={counts?.total ?? '—'} to="/products" />
+        <Stat label={label} value={counts?.total ?? '—'} to="/products" />
         <Stat label="Not yet classified" value={counts?.unclassified ?? '—'} to="/products" />
       </div>
     </Panel>
@@ -132,8 +140,8 @@ function AdminGlance() {
  * attention" slot (brief: facilitator/expert/admin workspaces should
  * optimize for this). Every number here comes from an endpoint the app
  * already calls elsewhere - no new backend work, no fabricated metrics. */
-export function DashboardAtAGlance({ role }: { role: UserRole }) {
+export function DashboardAtAGlance({ role, persona }: { role: UserRole; persona?: UserPersona | null }) {
   if (role === 'facilitator' || role === 'regulatory_expert') return <CaseQueueGlance />
   if (role === 'admin') return <AdminGlance />
-  return <ProductsGlance />
+  return <ProductsGlance persona={persona ?? null} />
 }

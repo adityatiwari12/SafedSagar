@@ -99,3 +99,63 @@ async def test_institutional_admin_can_assign_role_within_own_org(client, make_u
     assert resp.status_code == 201
     assert resp.json()["role_name"] == "user"
     assert resp.json()["organization_id"] == org_id
+
+
+async def test_kb_manager_sees_the_real_ingested_corpus(client, make_user):
+    _email, _pw, token = await make_user(role="kb_manager")
+    resp = await client.get("/admin/knowledge-base", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert len(rows) > 0
+    row = rows[0]
+    assert row["doc_id"]
+    assert row["title"]
+    assert row["chunk_count"] > 0
+    assert row["jurisdiction"] in ("india", "international")
+
+
+async def test_ministry_admin_and_institutional_admin_can_also_view_knowledge_base(client, make_user):
+    _email, _pw, ministry_token = await make_user(role="ministry_admin")
+    resp = await client.get("/admin/knowledge-base", headers={"Authorization": f"Bearer {ministry_token}"})
+    assert resp.status_code == 200
+
+    _email2, _pw2, inst_token = await make_user(role="institutional_admin")
+    resp2 = await client.get("/admin/knowledge-base", headers={"Authorization": f"Bearer {inst_token}"})
+    assert resp2.status_code == 200
+
+
+async def test_plain_user_cannot_view_knowledge_base(client, make_user):
+    _email, _pw, token = await make_user(role="user")
+    resp = await client.get("/admin/knowledge-base", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+
+
+async def test_audit_log_view_requires_audit_view_permission(client, make_user):
+    _email, _pw, user_token = await make_user(role="user")
+    resp = await client.get("/admin/audit-logs", headers={"Authorization": f"Bearer {user_token}"})
+    assert resp.status_code == 403
+
+    _email2, _pw2, admin_token = await make_user(role="ministry_admin")
+    resp2 = await client.get("/admin/audit-logs", headers={"Authorization": f"Bearer {admin_token}"})
+    assert resp2.status_code == 200
+    # ministry_admin's own make_user call, and any prior actions in this
+    # test run, already wrote real audit rows - this endpoint reads them
+    # back, it doesn't need to create one itself.
+    assert isinstance(resp2.json(), list)
+
+
+async def test_audit_log_shows_real_entries_with_actor_email(client, make_user):
+    _email, _pw, ministry_token = await make_user(role="ministry_admin")
+    # An action that's guaranteed to write a real audit row.
+    await client.post(
+        "/admin/organizations",
+        headers={"Authorization": f"Bearer {ministry_token}"},
+        json={"name": f"Audit-Org-{uuid.uuid4().hex[:8]}", "org_type": "institution"},
+    )
+
+    resp = await client.get("/admin/audit-logs", headers={"Authorization": f"Bearer {ministry_token}"})
+    assert resp.status_code == 200
+    entries = resp.json()
+    match = next((e for e in entries if e["action"] == "organization.create"), None)
+    assert match is not None
+    assert match["actor_email"] == _email

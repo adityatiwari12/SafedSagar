@@ -14,7 +14,18 @@ import { casesApi, CaseItem } from '../api/casesApi'
 import { ApiError } from '../api/http'
 import { useAuth } from '../auth/AuthContext'
 
-function CaseCard({ item, onChanged }: { item: CaseItem; onChanged: () => void }) {
+function CaseCard({
+  item,
+  onChanged,
+  readOnly,
+}: {
+  item: CaseItem
+  onChanged: () => void
+  /** A plain 'user' viewing their own submitted cases has neither
+   * CASE_ASSIGN nor CASE_CLOSE - claim/close would just 403. Show their
+   * status as information, not as actions that will fail. */
+  readOnly: boolean
+}) {
   const [resolution, setResolution] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -125,6 +136,12 @@ function CaseCard({ item, onChanged }: { item: CaseItem; onChanged: () => void }
         <p className="border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
           <span className="font-semibold">Resolved:</span> {item.resolution_summary}
         </p>
+      ) : readOnly ? (
+        <p className="border-t border-line pt-3 text-xs text-ink-faint">
+          {item.status === 'open'
+            ? 'Awaiting a facilitator to pick this up.'
+            : 'A facilitator/expert is reviewing this.'}
+        </p>
       ) : (
         <div className="space-y-2 border-t border-line pt-3">
           {item.status === 'open' && (
@@ -225,18 +242,23 @@ export default function CasesPage() {
   const [error, setError] = useState<string | null>(null)
 
   const isExpert = user?.role === 'regulatory_expert'
-  const title = mineOnly
-    ? isExpert
-      ? 'Compliance reviews'
-      : 'My cases'
-    : isExpert
-      ? 'Expert validation queue'
-      : 'Facilitator case queue'
-  const description = mineOnly
-    ? 'Cases assigned to you specifically, not the full open queue.'
-    : isExpert
-      ? 'Validate AI assessments against evidence, correct conclusions, and request missing information.'
-      : 'Triage escalations — claim open items, close with a resolution, or escalate further when needed.'
+  const isPlainUser = user?.role === 'user'
+  const title = isPlainUser
+    ? 'My cases'
+    : mineOnly
+      ? isExpert
+        ? 'Compliance reviews'
+        : 'My cases'
+      : isExpert
+        ? 'Expert validation queue'
+        : 'Facilitator case queue'
+  const description = isPlainUser
+    ? 'Questions you asked that were escalated for human review, and their status.'
+    : mineOnly
+      ? 'Cases assigned to you specifically, not the full open queue.'
+      : isExpert
+        ? 'Validate AI assessments against evidence, correct conclusions, and request missing information.'
+        : 'Triage escalations — claim open items, close with a resolution, or escalate further when needed.'
 
   async function load() {
     setLoading(true)
@@ -257,7 +279,7 @@ export default function CasesPage() {
   }, [statusFilter])
 
   const visible = [...cases]
-    .filter((c) => !mineOnly || c.assigned_facilitator_email === user?.email)
+    .filter((c) => isPlainUser || !mineOnly || c.assigned_facilitator_email === user?.email)
     .filter((c) => !lowConfidenceOnly || c.confidence_level === 'low')
     .sort(byPriority)
 
@@ -265,7 +287,7 @@ export default function CasesPage() {
     <AppWorkspaceShell>
       <PageHeader title={title} description={description} />
       <div className="space-y-5">
-        <AttentionSummary cases={cases} />
+        {!isPlainUser && <AttentionSummary cases={cases} />}
 
         <div className="flex flex-wrap items-center gap-2">
           {['', 'open', 'in_progress', 'closed'].map((s) => (
@@ -306,7 +328,7 @@ export default function CasesPage() {
 
         <div className="space-y-4">
           {visible.map((c) => (
-            <CaseCard key={c.id} item={c} onChanged={() => void load()} />
+            <CaseCard key={c.id} item={c} onChanged={() => void load()} readOnly={isPlainUser} />
           ))}
         </div>
       </div>

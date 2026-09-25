@@ -118,19 +118,35 @@ async def _to_case_out(db: AsyncSession, case: Case) -> CaseOut:
 @router.get("", response_model=list[CaseOut])
 async def list_cases(
     status_filter: str | None = None,
-    ctx: AuthzContext = Depends(require_permission(Permission.CASE_VIEW_QUEUE)),
+    ctx: AuthzContext = Depends(load_authz_context),
     db: AsyncSession = Depends(get_db),
 ) -> list[CaseOut]:
-    role_names = await _caller_role_names(ctx, db)
-    allowed_queues = {_ROLE_QUEUE[r] for r in role_names if r in _ROLE_QUEUE}
-    if not allowed_queues:
-        # Holds case.view_queue but none of the known reviewer roles (e.g.
-        # a future role added to the grant without a queue mapping here) -
-        # fail closed, not open, to an empty-but-200 queue rather than
-        # every case.
-        return []
+    """Two different views behind one endpoint, picked by which grant the
+    caller actually has - a reviewer (case.view_queue) sees their queue;
+    a plain user (case.view_own, already granted to RoleName.USER but
+    never read by any endpoint until now) sees their own submitted
+    cases. Neither grant -> 403, not an empty queue."""
+    is_reviewer = has_any_grant(ctx, Permission.CASE_VIEW_QUEUE)
+    is_own_viewer = has_any_grant(ctx, Permission.CASE_VIEW_OWN)
+    if not is_reviewer and not is_own_viewer:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Missing permission: {Permission.CASE_VIEW_QUEUE} or {Permission.CASE_VIEW_OWN}",
+        )
 
-    stmt = select(Case).where(Case.queue.in_(allowed_queues)).order_by(Case.created_at.desc())
+    if is_reviewer:
+        role_names = await _caller_role_names(ctx, db)
+        allowed_queues = {_ROLE_QUEUE[r] for r in role_names if r in _ROLE_QUEUE}
+        if not allowed_queues:
+            # Holds case.view_queue but none of the known reviewer roles
+            # (e.g. a future role added to the grant without a queue
+            # mapping here) - fail closed, not open, to an empty-but-200
+            # queue rather than every case.
+            return []
+        stmt = select(Case).where(Case.queue.in_(allowed_queues)).order_by(Case.created_at.desc())
+    else:
+        stmt = select(Case).where(Case.user_id == ctx.user.id).order_by(Case.created_at.desc())
+
     if status_filter:
         try:
             stmt = stmt.where(Case.status == CaseStatus(status_filter))

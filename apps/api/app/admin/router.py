@@ -8,11 +8,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin.schemas import (
+    AuditLogEntryOut,
     OrganizationCreate,
     OrganizationOut,
     RoleAssignmentCreate,
     RoleAssignmentOut,
     RoleOut,
+    SourceSummary,
     UserSummary,
 )
 from app.auth.dependencies import get_db
@@ -23,6 +25,7 @@ from app.db.models import (
     Organization,
     OrganizationType,
     Role,
+    SourceDocument,
     User,
     UserRoleAssignment,
 )
@@ -187,6 +190,77 @@ async def assign_role(
         role_name=role.name,
         organization_id=assignment.organization_id,
     )
+
+
+@router.get("/knowledge-base", response_model=list[SourceSummary])
+async def list_knowledge_base(
+    _ctx: AuthzContext = Depends(require_permission(Permission.SOURCE_VIEW)),
+    db: AsyncSession = Depends(get_db),
+) -> list[SourceSummary]:
+    """One row per doc_id, not per chunk - every chunk of a doc_id shares
+    the same title/authority/jurisdiction/doc_type/version/dates/url (see
+    ingestion/embed_and_load.py's load_document), so func.min() on each is
+    just "the value", not a real aggregation, and chunk_count is the one
+    real per-group aggregate."""
+    stmt = (
+        select(
+            SourceDocument.doc_id,
+            func.min(SourceDocument.title).label("title"),
+            func.min(SourceDocument.authority).label("authority"),
+            func.min(SourceDocument.jurisdiction).label("jurisdiction"),
+            func.min(SourceDocument.doc_type).label("doc_type"),
+            func.min(SourceDocument.version).label("version"),
+            func.min(SourceDocument.effective_date).label("effective_date"),
+            func.min(SourceDocument.last_verified_date).label("last_verified_date"),
+            func.min(SourceDocument.source_url).label("source_url"),
+            func.count().label("chunk_count"),
+        )
+        .group_by(SourceDocument.doc_id)
+        .order_by(SourceDocument.doc_id)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        SourceSummary(
+            doc_id=r.doc_id,
+            title=r.title,
+            authority=r.authority,
+            jurisdiction=r.jurisdiction.value if hasattr(r.jurisdiction, "value") else r.jurisdiction,
+            doc_type=r.doc_type,
+            version=r.version,
+            effective_date=r.effective_date.isoformat() if r.effective_date else None,
+            last_verified_date=r.last_verified_date.isoformat() if r.last_verified_date else None,
+            source_url=r.source_url,
+            chunk_count=r.chunk_count,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/audit-logs", response_model=list[AuditLogEntryOut])
+async def list_audit_logs(
+    limit: int = 200,
+    _ctx: AuthzContext = Depends(require_permission(Permission.AUDIT_VIEW)),
+    db: AsyncSession = Depends(get_db),
+) -> list[AuditLogEntryOut]:
+    capped_limit = min(max(limit, 1), 500)
+    stmt = (
+        select(AuditLogEntry, User.email)
+        .outerjoin(User, User.id == AuditLogEntry.actor_user_id)
+        .order_by(AuditLogEntry.created_at.desc())
+        .limit(capped_limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        AuditLogEntryOut(
+            id=entry.id,
+            actor_user_id=entry.actor_user_id,
+            actor_email=email,
+            action=entry.action,
+            detail=entry.detail,
+            created_at=entry.created_at,
+        )
+        for entry, email in rows
+    ]
 
 
 @router.delete("/users/{user_id}/roles/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)

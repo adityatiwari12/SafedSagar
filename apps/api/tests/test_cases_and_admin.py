@@ -61,10 +61,54 @@ async def _seed_case(user_email_suffix: str, queue: CaseQueue = CaseQueue.ip) ->
         return str(case.id), user.email
 
 
-async def test_case_queue_requires_facilitator_role(client, make_user):
+async def test_plain_user_sees_only_their_own_cases_not_the_full_queue(client, make_user):
+    # CASE_VIEW_OWN (granted to RoleName.USER) is a different, narrower
+    # view than CASE_VIEW_QUEUE (facilitator/legal_expert/regulatory_expert) -
+    # a plain user gets 200 + their own cases, never the full reviewer queue.
+    # _seed_case's user has no real UserRoleAssignment (it's a throwaway
+    # row, not a real login), so this needs a real make_user(role="user")
+    # account to mint a token that actually carries CASE_VIEW_OWN.
+    my_email, _pw, my_token = await make_user(role="user")
+
+    async with AsyncSessionLocal() as session:
+        from app.db.models import User
+
+        my_user = (await session.execute(select(User).where(User.email == my_email))).scalar_one()
+
+        conversation = Conversation(user_id=my_user.id)
+        session.add(conversation)
+        await session.flush()
+        my_case = Case(
+            user_id=my_user.id,
+            conversation_id=conversation.id,
+            question="My own question?",
+            product_classification="unclear",
+            jurisdiction="india",
+            confidence_score=0.1,
+            confidence_level="low",
+            risk_level=CaseRiskLevel.high,
+            status=CaseStatus.escalated,
+            queue=CaseQueue.ip,
+        )
+        session.add(my_case)
+        await session.commit()
+        my_case_id = str(my_case.id)
+
+    other_case_id, _other_email = await _seed_case(uuid.uuid4().hex[:8], queue=CaseQueue.ip)
+
+    resp = await client.get("/cases", headers={"Authorization": f"Bearer {my_token}"})
+    assert resp.status_code == 200
+    cases = resp.json()
+    case_ids = {c["id"] for c in cases}
+    assert my_case_id in case_ids
+    assert other_case_id not in case_ids
+
+
+async def test_user_with_no_cases_gets_empty_list_not_403(client, make_user):
     _email, _password, user_token = await make_user(role="user")
     resp = await client.get("/cases", headers={"Authorization": f"Bearer {user_token}"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 async def test_case_queue_lists_open_case(client, make_user):

@@ -21,7 +21,9 @@ export default function DashboardPage() {
           ? 'Validate assigned cases against evidence, correct AI conclusions, and request missing information.'
           : user.persona === 'practitioner_researcher'
             ? 'Research Sahayak, projects and prior-art workflows — always citation-grounded.'
-            : 'Ask IP-SAKTI, manage product dossiers, and escalate when confidence is insufficient.'
+            : user.persona === 'cultivator'
+              ? 'Track biological resources, TK/ABS indicators and documentation for what you cultivate.'
+              : 'Ask IP-SAKTI, manage product dossiers, and escalate when confidence is insufficient.'
 
   return (
     <AppWorkspaceShell>
@@ -50,7 +52,7 @@ export default function DashboardPage() {
         </Panel>
 
         <div className="space-y-4">
-          <DashboardAtAGlance role={user.role} />
+          <DashboardAtAGlance role={user.role} persona={user.persona} />
           <Panel title="Operating principles">
             <ul className="space-y-3 text-sm text-ink-muted">
               <li className="flex gap-2">
