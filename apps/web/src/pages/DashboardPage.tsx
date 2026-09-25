@@ -3,6 +3,7 @@ import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import { PageHeader, Panel, StatusBadge } from '../ui/primitives'
 import { useAuth } from '../auth/AuthContext'
 import { navForRole } from '../layout/navConfig'
+import { DashboardAtAGlance } from './DashboardAtAGlance'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -48,25 +49,28 @@ export default function DashboardPage() {
           </ul>
         </Panel>
 
-        <Panel title="Operating principles">
-          <ul className="space-y-3 text-sm text-ink-muted">
-            <li className="flex gap-2">
-              <StatusBadge status="high" label="Evidence" />
-              <span>Claims must cite retrieved sources.</span>
-            </li>
-            <li className="flex gap-2">
-              <StatusBadge status="medium" label="Jurisdiction" />
-              <span>India and International stay on separate tracks.</span>
-            </li>
-            <li className="flex gap-2">
-              <StatusBadge status="low" label="Human review" />
-              <span>Escalate when confidence is insufficient.</span>
-            </li>
-          </ul>
-          <p className="mt-4 text-xs text-ink-faint">
-            Guidance is informational — confirm filings against official gazettes.
-          </p>
-        </Panel>
+        <div className="space-y-4">
+          <DashboardAtAGlance role={user.role} />
+          <Panel title="Operating principles">
+            <ul className="space-y-3 text-sm text-ink-muted">
+              <li className="flex gap-2">
+                <StatusBadge status="high" label="Evidence" />
+                <span>Claims must cite retrieved sources.</span>
+              </li>
+              <li className="flex gap-2">
+                <StatusBadge status="medium" label="Jurisdiction" />
+                <span>India and International stay on separate tracks.</span>
+              </li>
+              <li className="flex gap-2">
+                <StatusBadge status="low" label="Human review" />
+                <span>Escalate when confidence is insufficient.</span>
+              </li>
+            </ul>
+            <p className="mt-4 text-xs text-ink-faint">
+              Guidance is informational — confirm filings against official gazettes.
+            </p>
+          </Panel>
+        </div>
       </div>
     </AppWorkspaceShell>
   )
