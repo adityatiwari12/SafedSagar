@@ -21,9 +21,19 @@ def score_confidence(state: GraphState) -> dict:
     elif total_claimed == 0:
         # Nothing was retrieved-and-cited: the model gave an uncited
         # answer (or the "no relevant sources" fallback) rather than a
-        # sourced one. Not zero (chunks did exist) but clearly weaker
-        # than a fully-cited answer.
-        score = 0.2
+        # sourced one. Previously a flat 0.2 regardless of retrieval depth,
+        # which forced escalate_if_needed to bounce EVERY uncited answer to
+        # a human - including ones where the corpus actually had decent
+        # (3+ chunk) coverage of the topic and the model just couldn't
+        # cleanly cite it. Deliberate, bounded widening: scaled by coverage
+        # so it can now just reach MEDIUM_THRESHOLD (0.4) at 3+ retrieved
+        # chunks - skipping forced escalation for a "corpus has real
+        # coverage, answer just wasn't cleanly cited" case - while thin
+        # coverage (0-2 chunks) still stays low and still escalates. This
+        # never manufactures a citation or a fact; it only changes whether
+        # a hedged, uncited-but-grounded-in-real-chunks answer is shown
+        # directly versus always routed to a human first.
+        score = 0.1 + 0.3 * min(retrieved_count / 3, 1.0)
     else:
         validity_ratio = len(validated) / total_claimed
         coverage = min(retrieved_count / 3, 1.0)  # a couple of good chunks is already decent coverage

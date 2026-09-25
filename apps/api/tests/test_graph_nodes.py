@@ -89,6 +89,34 @@ def test_score_confidence_low_when_all_citations_rejected():
     assert result["confidence_level"] == "low"
 
 
+def test_score_confidence_uncited_answer_with_thin_retrieval_stays_low():
+    # 1 retrieved chunk, nothing cited at all - thin corpus coverage on
+    # this topic, must still force escalation.
+    chunks = [_chunk("a")]
+    result = score_confidence({"reranked_chunks": chunks, "validated_citations": [], "rejected_citations": []})
+    assert result["confidence_level"] == "low"
+    assert result["confidence_score"] < 0.4
+
+
+def test_score_confidence_uncited_answer_with_decent_retrieval_reaches_medium():
+    # 3 retrieved chunks (decent corpus coverage), nothing cleanly cited -
+    # the deliberate widening: skips forced escalation instead of always
+    # bouncing every uncited answer to a human, regardless of how much
+    # real context was actually retrieved.
+    chunks = [_chunk("a"), _chunk("b"), _chunk("c")]
+    result = score_confidence({"reranked_chunks": chunks, "validated_citations": [], "rejected_citations": []})
+    assert result["confidence_level"] == "medium"
+    assert result["confidence_score"] == 0.4
+
+
+def test_score_confidence_uncited_never_reaches_high():
+    # Even with generous retrieval, an uncited answer must never outrank a
+    # properly validated one - "high" requires real validated citations.
+    chunks = [_chunk(str(i)) for i in range(10)]
+    result = score_confidence({"reranked_chunks": chunks, "validated_citations": [], "rejected_citations": []})
+    assert result["confidence_level"] != "high"
+
+
 def test_escalate_when_confidence_low():
     result = escalate_if_needed({"confidence_level": "low", "validated_citations": [], "product_classification": "cosmetic"})
     assert result["escalate"] is True
