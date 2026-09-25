@@ -263,6 +263,13 @@ export const productsApi = {
       getStoredToken(),
     )
   },
+  /** Every document the caller can see (own uploads + accessible
+   * products' + accessible cases') - the same GET /documents endpoint as
+   * listDocuments, just without the product_id filter. Backend already
+   * scopes this correctly (app/documents/router.py's list_documents). */
+  listAllDocuments(): Promise<DocumentMeta[]> {
+    return apiFetch<DocumentMeta[]>('/documents', {}, getStoredToken())
+  },
   /** Multipart upload — bypasses apiFetch (JSON-only: it would force a
    * `Content-Type: application/json` header onto a FormData body, breaking
    * the multipart boundary) in favour of a raw XMLHttpRequest so real

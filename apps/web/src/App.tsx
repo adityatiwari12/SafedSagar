@@ -17,10 +17,10 @@ import ProductDetailPage from './products/ProductDetailPage'
 import IpOpportunitiesPage from './research/IpOpportunitiesPage'
 import TkAbsExplorerPage from './research/TkAbsExplorerPage'
 import PriorArtPage from './research/PriorArtPage'
+import DocumentsLibraryPage from './research/DocumentsLibraryPage'
 
 const PLANNED = [
   '/regulatory',
-  '/documents',
   '/assessments',
   '/expert-assistance',
   '/reports',
@@ -114,6 +114,14 @@ export default function App() {
             element={
               <RequireAuth allow={['user']}>
                 <PriorArtPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/documents"
+            element={
+              <RequireAuth>
+                <DocumentsLibraryPage />
               </RequireAuth>
             }
           />

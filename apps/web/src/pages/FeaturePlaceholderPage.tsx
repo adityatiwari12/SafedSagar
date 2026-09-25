@@ -9,10 +9,6 @@ const COPY: Record<string, { title: string; body: string }> = {
     title: 'Regulatory',
     body: 'AYUSH, FSSAI and related pathway guidance structured by product category — separate from IP filing strategy.',
   },
-  '/documents': {
-    title: 'Documents',
-    body: 'Product and case document library — uploads, versions and linked assessments.',
-  },
   '/assessments': {
     title: 'Assessments',
     body: 'Saved AI assessments, confidence history and expert annotations.',
