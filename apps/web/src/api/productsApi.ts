@@ -273,16 +273,20 @@ export const productsApi = {
   /** Multipart upload — bypasses apiFetch (JSON-only: it would force a
    * `Content-Type: application/json` header onto a FormData body, breaking
    * the multipart boundary) in favour of a raw XMLHttpRequest so real
-   * upload progress can be reported via `onProgress`. */
+   * upload progress can be reported via `onProgress`. productId is
+   * optional — POST /documents accepts an unlinked upload just fine
+   * (product_id/case_id are both nullable server-side); the chat
+   * composer's "attach a file" control uses this to store a real file
+   * without linking it to a product/case or feeding it into retrieval. */
   uploadDocument(
-    input: { file: File; docKind: DocKind; productId: string },
+    input: { file: File; docKind: DocKind; productId?: string },
     onProgress?: (pct: number) => void,
   ): Promise<DocumentMeta> {
     return new Promise((resolve, reject) => {
       const form = new FormData()
       form.append('file', input.file)
       form.append('doc_kind', input.docKind)
-      form.append('product_id', input.productId)
+      if (input.productId) form.append('product_id', input.productId)
 
       const xhr = new XMLHttpRequest()
       xhr.open('POST', `${API_BASE}/documents`)

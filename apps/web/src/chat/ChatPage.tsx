@@ -15,6 +15,7 @@ import { GuidedIntakeForm } from './GuidedIntakeForm'
 import { AssessmentRail } from './AssessmentRail'
 import { EscalateButton } from './EscalateButton'
 import { useSpeechRecognition } from './useSpeechRecognition'
+import { ChatAttachments } from './ChatAttachments'
 
 export default function ChatPage() {
   const session = useChatSession()
@@ -336,6 +337,9 @@ export default function ChatPage() {
                     </button>
                   </div>
                 )}
+                <div className="mx-auto mb-2 w-full max-w-3xl">
+                  <ChatAttachments />
+                </div>
                 <form onSubmit={onSubmit} className="mx-auto w-full max-w-3xl">
                   <div className="flex items-end gap-2 border border-surface-border bg-white py-1.5 pl-3 pr-1.5 focus-within:border-saffron">
                     <label htmlFor="question" className="sr-only">
