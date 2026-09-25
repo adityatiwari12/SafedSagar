@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AppWorkspaceShell } from '../layout/AppWorkspaceShell'
 import {
   ConfidenceBadge,
@@ -210,6 +211,13 @@ function AttentionSummary({ cases }: { cases: CaseItem[] }) {
 
 export default function CasesPage() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  // "My Cases" (facilitator, ?scope=mine) and "Compliance Reviews" (expert,
+  // ?view=compliance) used to link here and render the identical
+  // unfiltered queue - both query params were silently ignored. Both now
+  // mean the same real thing: cases already claimed/assigned to me,
+  // rather than the full open queue including unclaimed items.
+  const mineOnly = searchParams.get('scope') === 'mine' || searchParams.get('view') === 'compliance'
   const [cases, setCases] = useState<CaseItem[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [lowConfidenceOnly, setLowConfidenceOnly] = useState(false)
@@ -217,10 +225,18 @@ export default function CasesPage() {
   const [error, setError] = useState<string | null>(null)
 
   const isExpert = user?.role === 'regulatory_expert'
-  const title = isExpert ? 'Expert validation queue' : 'Facilitator case queue'
-  const description = isExpert
-    ? 'Validate AI assessments against evidence, correct conclusions, and request missing information.'
-    : 'Triage escalations — claim open items, close with a resolution, or escalate further when needed.'
+  const title = mineOnly
+    ? isExpert
+      ? 'Compliance reviews'
+      : 'My cases'
+    : isExpert
+      ? 'Expert validation queue'
+      : 'Facilitator case queue'
+  const description = mineOnly
+    ? 'Cases assigned to you specifically, not the full open queue.'
+    : isExpert
+      ? 'Validate AI assessments against evidence, correct conclusions, and request missing information.'
+      : 'Triage escalations — claim open items, close with a resolution, or escalate further when needed.'
 
   async function load() {
     setLoading(true)
@@ -241,6 +257,7 @@ export default function CasesPage() {
   }, [statusFilter])
 
   const visible = [...cases]
+    .filter((c) => !mineOnly || c.assigned_facilitator_email === user?.email)
     .filter((c) => !lowConfidenceOnly || c.confidence_level === 'low')
     .sort(byPriority)
 
