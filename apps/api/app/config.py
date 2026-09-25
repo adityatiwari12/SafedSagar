@@ -21,8 +21,18 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 30
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_embed_model: str = "nomic-embed-text"
-    ollama_generate_model: str = "llama3.2"
+    # bge-m3: multilingual embedding (incl. Hindi), stronger BEIR retrieval
+    # scores than nomic-embed-text. 1024-dim vs nomic's 768 - changing this
+    # requires re-running ingestion/embed_and_load.py against a fresh Chroma
+    # collection (see chroma_collection below), never just a config flip.
+    ollama_embed_model: str = "bge-m3"
+    # llama3.1:8b: one of the few small local models with Hindi as an
+    # officially-supported training language (see Meta's model card language
+    # list), and stronger instruction-following than llama3.2:3b for
+    # reason_and_cite. Doesn't fully fit in 4GB VRAM (~4.9GB Q4_K_M) so it
+    # partially CPU-offloads - slower per-token than llama3.2:3b, traded for
+    # answer quality.
+    ollama_generate_model: str = "llama3.1:8b"
     # Context window for generation calls. Ollama's own default is 2048
     # tokens, and it silently truncates anything longer from the front -
     # which is where the reason_and_cite prompt keeps its rules (cite only
@@ -61,7 +71,11 @@ class Settings(BaseSettings):
     llm_fallback_to_local: bool = True
 
     chroma_base_url: str = "http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database"
-    chroma_collection: str = "source_chunks"
+    # New collection name on the bge-m3 switch: bge-m3 embeddings are
+    # 1024-dim vs nomic-embed-text's 768-dim, and Chroma collections are
+    # fixed-dimension once the first vector is added - reusing the old name
+    # would error on the first upsert against the existing 768-dim collection.
+    chroma_collection: str = "source_chunks_bge_m3"
 
     # IndicTrans2 sidecar (services/indictrans2-sidecar/) - a separate
     # Python 3.12 process, since this venv's Python 3.14 has no PyTorch

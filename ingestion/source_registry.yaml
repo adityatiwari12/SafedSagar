@@ -831,6 +831,36 @@ sources:
     last_verified_date: "2026-09-23"
     notes: "Comparative-advertising/disparagement dispute between two established Ayurvedic pharmaceutical companies over Chyawanprash product claims (ingredient counts/composition). Directly on-topic for Ayurvedic product advertising-claims questions, complementing the Drugs and Magic Remedies Act and FSSAI Ayurveda Aahara Regulations already in the corpus. Confirmed as the real judgment text describing the five impugned October-November 2021 advertisements, not a search-results page."
 
+  # --- Wave F (2026-09-24): closes the last named CLAUDE.md corpus gap,
+  # "export-market herbal regimes" - the two regulatory regimes that
+  # actually gate Ayurvedic/herbal product exports into the two largest
+  # single export destinations (EU, US). Both URLs fetched and extracted
+  # text checked against expected title/parties before being registered.
+
+  - doc_id: eu-thmpd-directive-2004-24-ec
+    title: "Directive 2004/24/EC of the European Parliament and of the Council of 31 March 2004 amending, as regards traditional herbal medicinal products, Directive 2001/83/EC"
+    authority: "European Parliament and Council of the European Union"
+    jurisdiction: international
+    doc_type: regulation
+    source_url: "http://web.archive.org/web/20230523185430/https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32004L0024"
+    format: pdf
+    version: "2004-03-31"
+    effective_date: "2004-04-30"
+    last_verified_date: "2026-09-24"
+    notes: "The EU's simplified registration regime for traditional herbal medicinal products (introduces Directive 2001/83/EC Articles 16a-16i) - the specific regulatory gate for any Ayurvedic/herbal product export into the EU market, closing CLAUDE.md's 'export-market herbal regimes' corpus gap. Enters into force on the day of its OJ publication (Art.3) - OJ L 136/85, published 30.4.2004 (date visible on the fetched PDF's own footer), used as effective_date. Member States had to transpose it into national law by 30 October 2005 (Art.2(1)) - a compliance deadline, not the Directive's own effective date, noted here rather than conflated with it. eur-lex.europa.eu blocks direct fetch from this environment with an AWS WAF challenge (202 Accepted, x-amzn-waf-action: challenge, empty body); Wayback Machine capture (2023-05-23) of the same EUR-Lex PDF export used instead, matching this file's established fallback pattern for WAF/SPA-blocked official sources."
+
+  - doc_id: us-dshea-1994
+    title: "Dietary Supplement Health and Education Act of 1994 (Public Law 103-417)"
+    authority: "United States Congress (103d Congress)"
+    jurisdiction: international
+    doc_type: regulation
+    source_url: "https://www.govinfo.gov/content/pkg/STATUTE-108/pdf/STATUTE-108-Pg4325.pdf"
+    format: pdf
+    version: "public-law-103-417"
+    effective_date: "1994-10-25"
+    last_verified_date: "2026-09-24"
+    notes: "Amends the Federal Food, Drug, and Cosmetic Act to establish the regulatory category and labeling/safety framework for dietary supplements in the US - the specific regulatory gate for any Ayurvedic/herbal product export into the US market (the largest single herbal-product export destination), closing the last of CLAUDE.md's named 'Known corpus gaps'. Directly fetched (200 OK, application/pdf) from govinfo.gov, the official US Government Publishing Office repository - no WAF/SPA blocker hit, unlike most other sources in this file. Enactment date (25 Oct 1994) taken directly from the statute's own header text ('PUBLIC LAW 103-417-OCT. 25, 1994')."
+
   - doc_id: dabur-v-nba-abs-2023
     title: "Dabur India Limited vs National Biodiversity Authority (National Green Tribunal, Southern Zone, 20 December 2023)"
     authority: "National Green Tribunal, Southern Zone, Chennai"

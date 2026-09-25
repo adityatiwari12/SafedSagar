@@ -28,9 +28,12 @@ from ingestion.fetch import DEFAULT_RAW_DIR, DEFAULT_REGISTRY, fetch_all  # noqa
 from ingestion.parse import parse_document  # noqa: E402
 
 OLLAMA_EMBED_URL = "http://localhost:11434/api/embed"
-OLLAMA_EMBED_MODEL = "nomic-embed-text"
+# Keep in sync with app/config.py's ollama_embed_model/chroma_collection -
+# this script doesn't import Settings (runs before the API venv is assumed
+# configured), so the two are duplicated deliberately, not accidentally.
+OLLAMA_EMBED_MODEL = "bge-m3"
 CHROMA_BASE_URL = "http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database"
-CHROMA_COLLECTION = "source_chunks"
+CHROMA_COLLECTION = "source_chunks_bge_m3"
 
 _SLUG_SAFE_RE = re.compile(r"[^a-zA-Z0-9_-]+")
 
